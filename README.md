@@ -1,4 +1,4 @@
-# ⚡ Enterprise Hybrid RAG System
+# ⚡ Enterprise  RAG System
 
 A production-grade **Retrieval-Augmented Generation (RAG)** application powered by **Groq LLMs**, **SentenceTransformers**, **FAISS + BM25 Hybrid Search**, **FlashRank Cross-Encoder Re-ranking**, and a **Streamlit Web Dashboard** alongside a **FastAPI REST API**.
 

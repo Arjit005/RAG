@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from src.rag.search import RAGSearch
 
 load_dotenv()
@@ -18,9 +19,7 @@ search_engine = RAGSearch()
 
 @app.get("/")
 def home():
-    return {
-        "message": "RAG API is running"
-    }
+    return FileResponse("static/index.html")
 
 
 @app.get("/health")

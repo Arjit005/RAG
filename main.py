@@ -1,12 +1,71 @@
-from fastapi import FastAPI
-app = FastAPI()
+import os
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+from src.rag.search import RAGSearch
+
+load_dotenv()
+
+app = FastAPI(
+    title="RAG API",
+    description="RAG application using FAISS and Groq",
+    version="1.0.0",
+)
+
+# Create the RAG engine once when the server starts
+search_engine = RAGSearch()
+
+
 @app.get("/")
 def home():
     return {
         "message": "RAG API is running"
     }
+
+
 @app.get("/health")
 def health():
     return {
         "status": "healthy"
     }
+
+
+@app.get("/ask")
+def ask(
+    question: str,
+    top_k: int = 3
+):
+    """
+    Ask a question to the RAG system.
+
+    Example:
+    /ask?question=What%20is%20attention%20mechanism%3F
+    """
+
+    if not question.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Question cannot be empty."
+        )
+
+    try:
+        result = search_engine.search_and_answer(
+            query=question,
+            top_k=top_k,
+            use_hybrid=True,
+            use_rerank=True
+        )
+
+        return {
+            "question": question,
+            "answer": result.get("answer"),
+            "citations": result.get("citations", [])
+        }
+
+    except Exception as e:
+        print(f"[ERROR] RAG request failed: {e}")
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )

@@ -3,6 +3,5 @@
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
-faiss_store/
 *.log
 .DS_Store

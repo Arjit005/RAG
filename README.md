@@ -102,7 +102,11 @@ Open `http://localhost:8501` in your browser.
 
 ### Option B: FastAPI REST Server
 ```bash
-uv run uvicorn rag.api:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8000
+```
+or simply:
+```bash
+python main.py
 ```
 Interactive API documentation is available at `http://localhost:8000/docs`.
 

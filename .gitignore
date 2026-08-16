@@ -1,7 +1,6 @@
-.venv/
-.env
+data/extracted_images/
 __pycache__/
+.venv/
+.pytest_cache/
 *.pyc
-.ipynb_checkpoints/
-*.log
-.DS_Store
+.env

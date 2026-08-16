@@ -50,14 +50,79 @@ class FaissVectorStore:
 
     def build_from_documents(self, documents: List[Any]):
         print(f"[INFO] Building vector store from {len(documents)} raw documents...")
+        
+        text_docs = []
+        multimodal_docs = []
+        for doc in documents:
+            doc_type = doc.metadata.get("type", "text")
+            if doc_type == "text":
+                text_docs.append(doc)
+            else:
+                multimodal_docs.append(doc)
+                
         emb_pipe = EmbeddingPipeline(model_name=self.embedding_model, chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
-        chunks = emb_pipe.chunk_documents(documents)
-        embeddings = emb_pipe.embed_chunks(chunks)
-        metadatas = [{**getattr(chunk, "metadata", {}), "text": chunk.page_content} for chunk in chunks]
+        
+        text_chunks = []
+        if text_docs:
+            text_chunks = emb_pipe.chunk_documents(text_docs)
+            
+        all_items = []
+        
+        for chunk in text_chunks:
+            all_items.append({
+                "embed_text": chunk.page_content,
+                "metadata": {
+                    "text": chunk.page_content,
+                    "type": "text",
+                    "source": chunk.metadata.get("source"),
+                    "filename": chunk.metadata.get("filename"),
+                    "page": chunk.metadata.get("page", 1)
+                }
+            })
+            
+        for doc in multimodal_docs:
+            doc_type = doc.metadata.get("type")
+            if doc_type == "table":
+                summary = doc.metadata.get("summary", doc.page_content)
+                all_items.append({
+                    "embed_text": summary,
+                    "metadata": {
+                        "text": doc.page_content,  # table markdown representation
+                        "summary": summary,
+                        "type": "table",
+                        "source": doc.metadata.get("source"),
+                        "filename": doc.metadata.get("filename"),
+                        "page": doc.metadata.get("page", 1)
+                    }
+                })
+            elif doc_type == "image":
+                all_items.append({
+                    "embed_text": doc.page_content,  # image summary text
+                    "metadata": {
+                        "text": doc.page_content,
+                        "type": "image",
+                        "image_path": doc.metadata.get("image_path"),
+                        "source": doc.metadata.get("source"),
+                        "filename": doc.metadata.get("filename"),
+                        "page": doc.metadata.get("page", 1)
+                    }
+                })
+                
+        if not all_items:
+            print("[WARNING] No items to index.")
+            return
+            
+        embed_texts = [item["embed_text"] for item in all_items]
+        metadatas = [item["metadata"] for item in all_items]
+        
+        print(f"[INFO] Generating dense embeddings for {len(embed_texts)} items...")
+        embeddings = self.model.encode(embed_texts, show_progress_bar=True)
         
         self.tokenized_corpus = [self._tokenize(m["text"]) for m in metadatas]
         self.bm25 = BM25Okapi(self.tokenized_corpus)
         
+        self.index = None
+        self.metadata = []
         self.add_embeddings(np.array(embeddings).astype('float32'), metadatas)
         self.save()
         print(f"[INFO] Vector store built with BM25 & FAISS and saved to {self.persist_dir}")
@@ -113,21 +178,15 @@ class FaissVectorStore:
         return results
 
     def hybrid_search(self, query_text: str, top_k: int = 5, rr_k: int = 60) -> List[dict]:
-        """
-        Reciprocal Rank Fusion (RRF) combining FAISS dense vector search & BM25 keyword search.
-        """
         fetch_k = max(top_k * 3, 20)
         
-        # 1. FAISS Search
         query_emb = self.model.encode([query_text]).astype('float32')
         dense_results = self.search(query_emb, top_k=fetch_k)
         
-        # 2. BM25 Search
         tokenized_query = self._tokenize(query_text)
         bm25_scores = self.bm25.get_scores(tokenized_query) if self.bm25 else np.zeros(len(self.metadata))
         sparse_indices = np.argsort(bm25_scores)[::-1][:fetch_k]
         
-        # 3. Reciprocal Rank Fusion
         rrf_scores = {}
         
         for rank, res in enumerate(dense_results):
@@ -150,9 +209,6 @@ class FaissVectorStore:
         return results
 
     def rerank(self, query_text: str, candidates: List[dict], top_k: int = 5) -> List[dict]:
-        """
-        FlashRank Cross-Encoder Re-ranking
-        """
         self.init_reranker()
         if not self.ranker or not candidates:
             return candidates[:top_k]
@@ -200,18 +256,3 @@ class FaissVectorStore:
             return self.rerank(query_text, candidates, top_k=top_k)
         
         return candidates[:top_k]
-
-# Example usage
-if __name__ == "__main__":
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
-
-    try:
-        from rag.dataloader import load_all_documents
-    except ImportError:
-        from dataloader import load_all_documents
-    docs = load_all_documents("data")
-    store = FaissVectorStore("faiss_store")
-    store.build_from_documents(docs)
-    store.load()
-    print(store.query("What is attention mechanism?", top_k=3, use_hybrid=True, use_rerank=True))

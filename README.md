@@ -1,15 +1,18 @@
-# ⚡Hybrid Enterprise  RAG System
+# ⚡ Enterprise Multi-Modal RAG System
 
-A production-grade **Retrieval-Augmented Generation (RAG)** application powered by **Groq LLMs**, **SentenceTransformers**, **FAISS + BM25 Hybrid Search**, **FlashRank Cross-Encoder Re-ranking**, and a **Streamlit Web Dashboard** alongside a **FastAPI REST API**.
+
+A production-grade **Multi-Modal Retrieval-Augmented Generation (RAG)** application powered by **Groq & Gemini LLMs**, **SentenceTransformers**, **FAISS + BM25 Hybrid Search**, **FlashRank Cross-Encoder Re-ranking**, and a **Streamlit Web Dashboard** alongside a **FastAPI REST API**. It ingests text, tables, and images/charts from PDF files and synthesizes multi-modal answers.
 
 ---
 
 ## 🌟 Key Features
 
+* 📸 **Multi-Modal Parsing**: Extracts text chunks, detects and formats tables to Markdown, and extracts images (diagrams, charts, graphs) from PDFs.
+* 🧠 **Gemini Visual Summarization**: Automatically describes tables and extracted images/charts using `gemini-1.5-flash`, indexing the generated text summaries for hybrid dense-sparse search.
 * 🔍 **Hybrid Search (BM25 + FAISS)**: Combines keyword search (sparse BM25) with semantic embeddings (dense FAISS) via Reciprocal Rank Fusion (RRF).
 * ⚡ **FlashRank Re-Ranking**: Uses CPU cross-encoders (`ms-marco-TinyBERT-L-2-v2`) to re-rank top candidates for optimal relevance.
-* 🚀 **Groq LLM Acceleration**: Powered by `llama-3.3-70b-versatile` and `gemma2-9b-it` for sub-second responses.
-* 📑 **Source Citations & Page Tracking**: Every response cites exact PDF filenames, 1-indexed page numbers, and snippet previews.
+* 🚀 **Groq & Gemini Orchestration**: Powered by Groq `llama-3.3-70b-versatile` and Gemini models for high-quality, sub-second responses.
+* 📑 **Source Citations & Page Tracking**: Cites exact PDF filenames, 1-indexed page numbers, and snippet previews. Renders tabular data and displays the actual images/charts in the Streamlit Q&A conversation.
 * 🌐 **Interactive Streamlit UI**: User-friendly chat interface with drag-and-drop file uploading and sidebar controls.
 * 📡 **FastAPI REST Backend**: Exposes `/api/query`, `/api/upload`, and `/api/health` endpoints with interactive Swagger documentation.
 
@@ -17,52 +20,53 @@ A production-grade **Retrieval-Augmented Generation (RAG)** application powered 
 
 ## 🛠️ How I Built It: Step-by-Step Architecture
 
-### 1. Ingestion & Metadata Preservation (`dataloader.py`)
-Loaded multi-format documents (PDFs, TXT) using LangChain's community loaders. Instead of discarding file source paths or page numbers, I normalized all metadata dynamically to keep track of:
-* Document filename.
-* PDF 1-indexed page numbers.
-* Row indexes for CSVs.
+### 1. Ingestion & Multi-Modal Extraction (`dataloader.py`)
+Loads multi-format documents (PDFs, TXT, CSV, DOCX, XLSX) and performs multi-modal parsing on PDFs:
+* **Standard Text Chunks**: Extracted and tagged with page metadata.
+* **Tables**: Extracted using layout table finders, mapped to Markdown tables, and summarized using Gemini to build searchable index representations.
+* **Images/Charts**: Saved to `data/extracted_images/` and passed to `gemini-1.5-flash` with a detail-oriented vision description prompt. The description is embedded to allow semantic image search.
 
 ### 2. Chunking & Embeddings (`embedding.py`)
-Split large texts into logical chunks using `RecursiveCharacterTextSplitter` with a chunk size of `1000` tokens and `200` overlap. Vectorized the chunks using `all-MiniLM-L6-v2` SentenceTransformer embeddings, generating `384`-dimension vectors.
+Splits large text documents into logical chunks using `RecursiveCharacterTextSplitter` (chunk size: `1000`, overlap: `200`). Chunks, table summaries, and image summaries are vectorized using `all-MiniLM-L6-v2` SentenceTransformer embeddings, yielding `384`-dimension vectors.
 
-### 3. FAISS Vector Database (`vectorstore.py`)
-Implemented `FaissVectorStore` using `faiss.IndexFlatL2` for high-speed dense vector similarity retrieval on CPU, persisting the vector index and metadata dictionaries locally.
+### 3. FAISS Vector Database & BM25 Keyword Search (`vectorstore.py`)
+* Implements `FaissVectorStore` with `faiss.IndexFlatL2` for high-speed dense vector similarity retrieval on CPU.
+* Builds a sparse `rank_bm25` (specifically `BM25Okapi`) keyword index over the corpus.
 
-### 4. Sparse BM25 Keyword Search
-Added `rank_bm25` (specifically `BM25Okapi`) to tokenize document chunks. This allows the retriever to match exact keywords (e.g. terminology, names, codes) that vector search sometimes misses.
-
-### 5. Reciprocal Rank Fusion (RRF)
-Implemented Reciprocal Rank Fusion (RRF) to merge the candidate lists from dense FAISS and sparse BM25:
+### 4. Reciprocal Rank Fusion (RRF)
+Merges candidate lists from dense FAISS search and sparse BM25 keyword search:
 $$RRF(d) = \sum_{m \in M} \frac{1}{60 + \text{rank}_m(d)}$$
-This scores chunks objectively based on their positions in both lists.
+This matches exact keywords/codes as well as semantic topics.
 
-### 6. FlashRank Cross-Encoder Re-ranking
-Integrated the **FlashRank** re-ranker model (`ms-marco-TinyBERT-L-2-v2`). The model acts as a secondary evaluator, taking the top retrieved context chunks and re-scoring them against the query to return the top 3-5 high-relevance matches.
+### 5. FlashRank Cross-Encoder Re-ranking
+Integrates the **FlashRank** re-ranker model (`ms-marco-TinyBERT-L-2-v2`) to re-score the merged RRF search candidates against the user query, selecting the top 3-5 matches.
 
-### 7. Grounded LLM Orchestration (`search.py`)
-Integrated Groq's high-speed API (`llama-3.3-70b-versatile`). Structured the system prompt to enforce strict context-grounded rules: the LLM must only use retrieved context, cite page numbers directly, and state if it doesn't know. Included conversational memory tracking for multi-turn Q&A.
+### 6. Grounded LLM Orchestration (`search.py`)
+Integrates Groq's high-speed API (`llama-3.3-70b-versatile`) and Gemini. The orchestration engine enforces strict context-grounded rules: the LLM must only use retrieved context, cite page numbers directly, output Markdown tables, reference images, and track conversation history.
 
-### 8. Web Interface & API Hosting (`ui.py`, `api.py`)
-* Created a **Streamlit** user interface with interactive toggles for Hybrid search / Reranking.
-* Built a **FastAPI** web server with CORS, exposing standard JSON endpoints (`/api/query`, `/api/upload`) for integration into external apps.
+### 7. Web Interface & API Hosting (`ui.py`, `api.py`)
+* **Streamlit UI**: Displays conversational memory, renders table content as clean interactive widgets, and displays cited images directly inside the app.
+* **FastAPI Server**: Hosts standard JSON Q&A endpoints.
 
 ---
 
 ## 📁 Repository Structure
 
 ```text
-├── data/                  # Storage folder for PDFs, TXT, CSV, DOCX files
+├── data/                  # Storage folder for PDFs, TXT, CSV, DOCX, XLSX files
+│   └── extracted_images/  # Extracted images and charts from parsed PDFs
 ├── src/
 │   └── rag/
 │       ├── app.py         # Terminal CLI entry point
 │       ├── api.py         # FastAPI REST server
-│       ├── dataloader.py  # Document ingestion & metadata extraction
+│       ├── dataloader.py  # Multi-modal document ingestion & extraction
 │       ├── embedding.py   # Text chunking & SentenceTransformer embeddings
-│       ├── search.py      # Conversational RAG engine with Groq LLM
+│       ├── search.py      # Conversational RAG engine with Groq & Gemini
 │       ├── ui.py          # Streamlit Web Application
+│       ├── patch_uuid.py  # Utility to patch uuid_utils dependency blocks
+│       ├── test_multimodal.py # Dry-run validation script
 │       └── vectorstore.py # FAISS + BM25 hybrid index & FlashRank reranker
-├── .env                   # Environment variables (GROQ_API_KEY)
+├── .env                   # Environment variables (GROQ_API_KEY, GEMINI_API_KEY)
 ├── pyproject.toml         # UV package configuration & dependencies
 └── README.md              # Project documentation
 ```
@@ -84,10 +88,11 @@ uv sync
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env` file in the root directory and add your Groq API key:
+Create a `.env` file in the root directory and add your API keys:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 ```
 
 ---

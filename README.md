@@ -120,7 +120,3 @@ Interactive API documentation is available at `http://localhost:8000/docs`.
 uv run python src/rag/app.py
 ```
 
----
-
-## 🤝 License
-Distributed under the MIT License.

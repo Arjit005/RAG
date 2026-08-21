@@ -5,6 +5,23 @@ A production-grade **Multi-Modal Retrieval-Augmented Generation (RAG)** applicat
 
 ---
 
+## 🔄 RAG Workflow Process
+
+![RAG Workflow Process](static/rag_workflow.png)
+
+The system processes queries through a five-stage pipeline:
+
+1. **User Input**: The user submits a query, question, or document request through the Streamlit interface or the FastAPI REST endpoint.
+2. **Knowledge Base Retrieval**: The system performs a hybrid dense-sparse search over the ingested document indexes:
+   * **Dense Search**: Compares sentence embeddings using FAISS.
+   * **Sparse Search**: Performs exact keyword matching using BM25.
+   * **Re-ranking**: FlashRank re-scores and filters the top matching chunks to ensure maximum relevance.
+3. **Augmentation**: The retrieved text snippets, formatted Markdown tables, and visual descriptions are combined with the user's original prompt along with conversational history to construct an augmented context.
+4. **LLM Response Generation**: The LLM (e.g., Groq `llama-3.3-70b-versatile` or Gemini) processes the augmented prompt, drafting a response strictly grounded in the retrieved content.
+5. **Output Delivery**: The final answer is delivered back to the user, displaying references, direct page citations, clean Markdown tables, and embedded images or charts.
+
+---
+
 ## 🌟 Key Features
 
 * 📸 **Multi-Modal Parsing**: Extracts text chunks, detects and formats tables to Markdown, and extracts images (diagrams, charts, graphs) from PDFs.

@@ -117,11 +117,8 @@ st.markdown('<div class="sub-header">Ask questions across your PDFs, tables, and
 with st.sidebar:
     st.title("⚙️ Control Panel")
     
-    # API Keys Configuration
-    st.subheader("🔑 API Configuration")
-    gemini_key = st.text_input("Enter GEMINI_API_KEY:", type="password", value=os.getenv("GEMINI_API_KEY", ""), help="Required for parsing/summarizing images & tables, and multimodal answers.")
-    if gemini_key:
-        os.environ["GEMINI_API_KEY"] = gemini_key
+    # API Keys from Environment
+    gemini_key = os.getenv("GEMINI_API_KEY")
     
     # Model Selection
     model_choice = st.selectbox(

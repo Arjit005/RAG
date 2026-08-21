@@ -44,7 +44,7 @@ def generate_image_summary(image_path: str, api_key: str) -> str:
             img_b64 = base64.b64encode(image_file.read()).decode("utf-8")
         
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-3.6-flash",
             google_api_key=api_key,
             temperature=0.0
         )
@@ -72,7 +72,7 @@ def generate_table_summary(table_markdown: str, api_key: str) -> str:
         return "Table extracted from document. (Summarization skipped: GEMINI_API_KEY not configured)"
     try:
         llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
+            model="gemini-3.6-flash",
             google_api_key=api_key,
             temperature=0.0
         )

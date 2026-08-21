@@ -16,6 +16,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from src.rag.search import RAGSearch
 
+from fastapi.staticfiles import StaticFiles
+
 load_dotenv()
 
 app = FastAPI(
@@ -23,6 +25,10 @@ app = FastAPI(
     description="RAG application using FAISS and Groq",
     version="1.0.0",
 )
+
+# Ensure data/extracted_images exists and mount it
+os.makedirs("data/extracted_images", exist_ok=True)
+app.mount("/extracted_images", StaticFiles(directory="data/extracted_images"), name="extracted_images")
 
 # Create the RAG engine once when the server starts
 search_engine = RAGSearch()
@@ -66,10 +72,16 @@ def ask(
             use_rerank=True
         )
 
+        citations = result.get("citations", [])
+        for cit in citations:
+            if cit.get("type") == "image" and cit.get("image_path"):
+                filename = os.path.basename(cit["image_path"])
+                cit["image_url"] = f"/extracted_images/{filename}"
+
         return {
             "question": question,
             "answer": result.get("answer"),
-            "citations": result.get("citations", [])
+            "citations": citations
         }
 
     except Exception as e:
@@ -79,3 +91,4 @@ def ask(
             status_code=500,
             detail=str(e)
         )
+

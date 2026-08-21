@@ -42,10 +42,17 @@ def test_dry_run():
     print("Running a sample query...")
     res = search_engine.search_and_answer("attention mechanism", top_k=3)
     print("\nAnswer:")
-    print(res.get("answer"))
+    try:
+        print(res.get("answer"))
+    except UnicodeEncodeError:
+        print(res.get("answer", "").encode("utf-8", errors="ignore").decode("utf-8", errors="ignore"))
     print("\nCitations:")
     for cit in res.get("citations", []):
-        print(f"- {cit['source']} (Page {cit['page']}) [{cit['type']}] (dist: {cit['distance']})")
+        cit_str = f"- {cit['source']} (Page {cit['page']}) [{cit['type']}] (dist: {cit['distance']})"
+        try:
+            print(cit_str)
+        except UnicodeEncodeError:
+            print(cit_str.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore"))
 
 if __name__ == "__main__":
     test_dry_run()

@@ -29,7 +29,7 @@ except ImportError:
 load_dotenv()
 
 class RAGSearch:
-    def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2", llm_model: str = "llama-3.3-70b-versatile", gemini_api_key: str = None):
+    def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2", llm_model: str = "qwen/qwen3.6-27b", gemini_api_key: str = None):
         self.persist_dir = persist_dir
         self.embedding_model = embedding_model
         self.llm_model = llm_model

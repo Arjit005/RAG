@@ -13,7 +13,7 @@ if not api_key:
 client = Groq(api_key=api_key)
 
 response = client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
+    model="qwen/qwen3.6-27b",
     messages=[
         {
             "role": "user",

@@ -44,7 +44,7 @@ def get_rag_engine() -> RAGSearch:
 class QueryRequest(BaseModel):
     query: str = Field(..., description="User question or query string", example="What is attention mechanism?")
     top_k: int = Field(5, ge=1, le=20, description="Number of chunks to retrieve")
-    model: str = Field("llama-3.3-70b-versatile", description="Groq LLM model name")
+    model: str = Field("qwen/qwen3.6-27b", description="Groq LLM model name")
     use_hybrid: bool = Field(True, description="Enable BM25 + FAISS Hybrid Search")
     use_rerank: bool = Field(True, description="Enable FlashRank Cross-Encoder Re-ranking")
     chat_history: Optional[List[Dict[str, Any]]] = Field(default=[], description="Previous conversation history")

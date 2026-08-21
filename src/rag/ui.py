@@ -126,7 +126,7 @@ with st.sidebar:
     # Model Selection
     model_choice = st.selectbox(
         "Select Groq Text LLM (Fallback):",
-        ["llama-3.3-70b-versatile", "gemma2-9b-it", "llama3-8b-8192"],
+        ["qwen/qwen3.6-27b", "openai/gpt-oss-20b", "openai/gpt-oss-120b", "groq/compound-mini"],
         index=0
     )
     

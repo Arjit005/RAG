@@ -22,6 +22,30 @@ The system processes queries through a five-stage pipeline:
 
 ---
 
+## 🏗️ Multi-Modal RAG System Architecture
+
+![Multi-Modal RAG System Architecture](static/rag_architecture.jpg)
+
+The system architecture is structured into six modular layers:
+
+1. **Data Ingestion**: Support for multiple file formats including PDFs, CSVs, Excel spreadsheets (`.xlsx`), and raw text files.
+2. **Multimodal Parsing & Processing**: 
+   * **Text Content**: Extracted directly and split into chunks.
+   * **Tables**: Extracted using structural table identifiers, formatted as Markdown tables, and summarized.
+   * **Images & Charts**: Extracted and visually summarized using `gemini-1.5-flash` to make visual content searchable.
+3. **Vector Indexing & Storage**:
+   * **FAISS Dense Index**: Stores semantic vector representations using SentenceTransformers (`all-MiniLM-L6-v2`) for text chunks, table summaries, and image descriptions.
+   * **BM25 Sparse Index**: Stores lexical indices of text/table keywords for keyword matching.
+   * **Vector DB & Metadata Store**: Combines vector lookup with document mapping metadata.
+4. **Retrieval Engine**:
+   * **Hybrid Search**: Interrogates both dense (FAISS) and sparse (BM25) indexes concurrently.
+   * **Reciprocal Rank Fusion (RRF)**: Merges sparse and dense search candidates into a unified rank list.
+   * **FlashRank Re-ranking**: Employs cross-encoders (`ms-marco-TinyBERT-L-2-v2`) to re-score candidates, selecting the top matches.
+5. **Orchestrated Generation**: Passes context-grounded prompts to high-performance LLMs (Groq `llama-3.3-70b-versatile` or Gemini) to synthesize accurate responses.
+6. **Delivery**: Distributes final answers with source citations, Markdown tables, and visual assets via Streamlit or FastAPI endpoints.
+
+---
+
 ## 🌟 Key Features
 
 * 📸 **Multi-Modal Parsing**: Extracts text chunks, detects and formats tables to Markdown, and extracts images (diagrams, charts, graphs) from PDFs.

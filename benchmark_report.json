@@ -1,0 +1,34 @@
+{
+  "timestamp": "2026-09-12T18:29:39Z",
+  "queries_tested": 4,
+  "benchmark_results": [
+    {
+      "strategy": "Dense-Only (FAISS)",
+      "recall_at_3": "75.0%",
+      "recall_at_5": "75.0%",
+      "keyword_coverage": "62.5%",
+      "avg_latency_ms": "30.97 ms"
+    },
+    {
+      "strategy": "Sparse-Only (BM25)",
+      "recall_at_3": "75.0%",
+      "recall_at_5": "75.0%",
+      "keyword_coverage": "81.2%",
+      "avg_latency_ms": "3.01 ms"
+    },
+    {
+      "strategy": "Hybrid (FAISS + BM25 via RRF)",
+      "recall_at_3": "75.0%",
+      "recall_at_5": "75.0%",
+      "keyword_coverage": "75.0%",
+      "avg_latency_ms": "23.47 ms"
+    },
+    {
+      "strategy": "Hybrid + FlashRank Re-ranking",
+      "recall_at_3": "75.0%",
+      "recall_at_5": "75.0%",
+      "keyword_coverage": "81.2%",
+      "avg_latency_ms": "272.27 ms"
+    }
+  ]
+}

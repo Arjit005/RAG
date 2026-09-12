@@ -215,6 +215,138 @@ Detailed Answer:"""
             "citations": citations
         }
 
+    def stream_and_answer(self, query: str, top_k: int = 5, chat_history: list = None, use_hybrid: bool = True, use_rerank: bool = True):
+        """
+        Yields tokens and citations in real time as an event stream.
+        1st event: {"type": "citations", "citations": [...]}
+        subsequent events: {"type": "token", "token": "..."}
+        final event: {"type": "done"}
+        """
+        results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+        
+        context_blocks = []
+        citations = []
+        images_to_send = []
+        
+        for idx, r in enumerate(results, 1):
+            meta = r.get("metadata") or {}
+            text = meta.get("text", "")
+            source = meta.get("source") or meta.get("filename") or "Unknown Document"
+            page = meta.get("page", 1)
+            dist = float(r.get("distance", 0.0))
+            doc_type = meta.get("type", "text")
+            
+            if doc_type == "image":
+                image_path = meta.get("image_path")
+                if image_path and os.path.exists(image_path):
+                    try:
+                        with open(image_path, "rb") as img_file:
+                            img_b64 = base64.b64encode(img_file.read()).decode("utf-8")
+                        images_to_send.append({
+                            "type": "image_url",
+                            "image_url": {"url": f"data:image/png;base64,{img_b64}"}
+                        })
+                        context_blocks.append(f"[Document {idx} (Image summary): {source} (Page {page})]\n{text}")
+                        citations.append({
+                            "source": source,
+                            "page": page,
+                            "snippet": f"Visual Image content summary: {text}",
+                            "distance": round(dist, 4),
+                            "type": "image",
+                            "image_path": image_path
+                        })
+                    except Exception as e:
+                        print(f"[ERROR] Failed to read image {image_path}: {e}")
+                else:
+                    context_blocks.append(f"[Document {idx} (Image metadata missing/removed): {source} (Page {page})]\n{text}")
+                    citations.append({
+                        "source": source,
+                        "page": page,
+                        "snippet": f"Image (file missing): {text}",
+                        "distance": round(dist, 4),
+                        "type": "image"
+                    })
+            elif doc_type == "table":
+                context_blocks.append(f"[Document {idx} (Table): {source} (Page {page})]\n{text}")
+                citations.append({
+                    "source": source,
+                    "page": page,
+                    "snippet": f"Structured Table Data:\n{text}",
+                    "distance": round(dist, 4),
+                    "type": "table"
+                })
+            else:
+                context_blocks.append(f"[Document {idx} (Text): {source} (Page {page})]\n{text}")
+                citations.append({
+                    "source": source,
+                    "page": page,
+                    "snippet": text[:350] + ("..." if len(text) > 350 else ""),
+                    "distance": round(dist, 4),
+                    "type": "text"
+                })
+
+        context_str = "\n\n---\n\n".join(context_blocks)
+        
+        # 1. Yield citations first
+        yield {"type": "citations", "citations": citations}
+
+        if not context_str:
+            yield {"type": "token", "token": "No relevant document chunks were found in the knowledge base."}
+            yield {"type": "done"}
+            return
+
+        history_str = ""
+        if chat_history:
+            formatted_history = []
+            for msg in chat_history[-6:]:
+                role = "User" if msg.get("role") == "user" else "Assistant"
+                formatted_history.append(f"{role}: {msg.get('content', '')}")
+            history_str = "\nPrevious Conversation:\n" + "\n".join(formatted_history) + "\n"
+
+        prompt_instructions = f"""You are a helpful and precise RAG assistant. Answer the user's question using ONLY the provided document context below (which includes text, extracted table structures, and images).
+If the context does not contain enough information to answer, state clearly that the documents do not specify.
+Always refer to the specific source document and page number when citing facts.
+
+{history_str}
+Context from Documents:
+{context_str}
+
+User Question: {query}
+
+Detailed Answer:"""
+
+        # Stream with Gemini Multi-modal if available
+        if self.gemini_llm and (images_to_send or os.getenv("FORCE_GEMINI", "false").lower() == "true"):
+            try:
+                content = [{"type": "text", "text": prompt_instructions}] + images_to_send
+                message = HumanMessage(content=content)
+                for chunk in self.gemini_llm.stream([message]):
+                    if chunk.content:
+                        yield {"type": "token", "token": chunk.content}
+                yield {"type": "done"}
+                return
+            except Exception as e:
+                print(f"[ERROR] Gemini streaming failed: {e}. Falling back to standard LLM.")
+
+        if not self.llm:
+            warning_msg = ""
+            if images_to_send and not self.gemini_llm:
+                warning_msg = "\n\n*(Note: Some relevant images/charts were retrieved but could not be visually processed because GEMINI_API_KEY is not set.)*\n"
+            yield {"type": "token", "token": f"**Retrieved Context (No LLM Key configured/available):**\n\n{context_str}{warning_msg}"}
+            yield {"type": "done"}
+            return
+
+        try:
+            for chunk in self.llm.stream([prompt_instructions]):
+                if chunk.content:
+                    yield {"type": "token", "token": chunk.content}
+            if images_to_send and not self.gemini_llm:
+                yield {"type": "token", "token": "\n\n*(Note: Some relevant charts or images were retrieved but could not be visually processed because GEMINI_API_KEY is not set.)*"}
+        except Exception as e:
+            yield {"type": "token", "token": f"Error generating answer with Groq LLM: {str(e)}"}
+
+        yield {"type": "done"}
+
 if __name__ == "__main__":
     rag_search = RAGSearch()
     res = rag_search.search_and_answer("What is attention mechanism?", top_k=3)

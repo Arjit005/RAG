@@ -1,8 +1,10 @@
 import os
 import sys
+import json
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -122,8 +124,47 @@ def query_rag(req: QueryRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error executing RAG search: {str(e)}")
 
+@app.post("/api/query/stream", tags=["RAG Search"])
+def query_rag_stream(req: QueryRequest):
+    """
+    Stream tokens in real-time via Server-Sent Events (SSE).
+    Returns SSE data events with citations and incremental text tokens.
+    """
+    engine = get_rag_engine()
+    if req.model != engine.llm_model:
+        engine.llm_model = req.model
+        engine.init_llm()
+
+    def event_generator():
+        try:
+            for event in engine.stream_and_answer(
+                query=req.query,
+                top_k=req.top_k,
+                chat_history=req.chat_history,
+                use_hybrid=req.use_hybrid,
+                use_rerank=req.use_rerank
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            err_event = {"type": "error", "error": str(e)}
+            yield f"data: {json.dumps(err_event)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 @app.post("/api/upload", tags=["Document Management"])
-async def upload_documents(files: List[UploadFile] = File(...)):
+async def upload_documents(
+    background_tasks: BackgroundTasks,
+    files: List[UploadFile] = File(...),
+    background_index: bool = Query(True, description="Schedule index rebuild in background to avoid blocking API")
+):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided.")
         
@@ -142,15 +183,23 @@ async def upload_documents(files: List[UploadFile] = File(...)):
             f.write(content)
         saved_files.append(file.filename)
         
-    # Rebuild Index
     engine = get_rag_engine()
-    engine.rebuild_index()
-    
-    return {
-        "message": f"Successfully uploaded and indexed {len(saved_files)} file(s).",
-        "uploaded_files": saved_files
-    }
+    if background_index:
+        background_tasks.add_task(engine.rebuild_index)
+        return {
+            "status": "processing",
+            "message": f"Successfully uploaded {len(saved_files)} file(s). Vector indexing scheduled in background.",
+            "uploaded_files": saved_files
+        }
+    else:
+        engine.rebuild_index()
+        return {
+            "status": "completed",
+            "message": f"Successfully uploaded and synchronously indexed {len(saved_files)} file(s).",
+            "uploaded_files": saved_files
+        }
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+

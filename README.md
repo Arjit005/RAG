@@ -48,6 +48,9 @@ The system architecture is structured into six modular layers:
 
 ## 🌟 Key Features
 
+* ⚡ **Real-Time SSE Token Streaming**: Streams incremental answer tokens and structured citations via Server-Sent Events (`/api/query/stream`).
+* 🔄 **Non-Blocking Background Ingestion**: Uses FastAPI `BackgroundTasks` for asynchronous vector indexing without blocking REST API requests.
+* 📊 **Automated Benchmark & Evaluation Suite**: Includes `evaluate_rag.py` to quantitatively benchmark Dense vs Sparse vs Hybrid vs Cross-Encoder strategies on latency, Recall@K, and keyword coverage.
 * 📸 **Multi-Modal Parsing**: Extracts text chunks, detects and formats tables to Markdown, and extracts images (diagrams, charts, graphs) from PDFs.
 * 🧠 **Gemini Visual Summarization**: Automatically describes tables and extracted images/charts using `gemini-1.5-flash`, indexing the generated text summaries for hybrid dense-sparse search.
 * 🔍 **Hybrid Search (BM25 + FAISS)**: Combines keyword search (sparse BM25) with semantic embeddings (dense FAISS) via Reciprocal Rank Fusion (RRF).
@@ -55,7 +58,7 @@ The system architecture is structured into six modular layers:
 * 🚀 **Groq & Gemini Orchestration**: Powered by Groq `llama-3.3-70b-versatile` and Gemini models for high-quality, sub-second responses.
 * 📑 **Source Citations & Page Tracking**: Cites exact PDF filenames, 1-indexed page numbers, and snippet previews. Renders tabular data and displays the actual images/charts in the Streamlit Q&A conversation.
 * 🌐 **Interactive Streamlit UI**: User-friendly chat interface with drag-and-drop file uploading and sidebar controls.
-* 📡 **FastAPI REST Backend**: Exposes `/api/query`, `/api/upload`, and `/api/health` endpoints with interactive Swagger documentation.
+* 📡 **FastAPI REST Backend**: Exposes `/api/query`, `/api/query/stream`, `/api/upload`, and `/api/health` endpoints with interactive Swagger documentation.
 
 ---
 
@@ -160,4 +163,30 @@ Interactive API documentation is available at `http://localhost:8000/docs`.
 ```bash
 uv run python src/rag/app.py
 ```
+
+### Option D: Run Retrieval Benchmark & Evaluation Suite
+```bash
+python evaluate_rag.py
+```
+
+---
+
+## 📊 Retrieval Benchmark & Performance Evaluation
+
+The repository includes an empirical benchmark harness (`evaluate_rag.py`) to systematically compare retrieval accuracy, keyword coverage, and latency across four search configurations:
+
+| Strategy | Recall@3 | Recall@5 | Keyword Coverage | Avg Latency |
+| :--- | :---: | :---: | :---: | :---: |
+| **Dense-Only (FAISS)** | 75.0% | 75.0% | 62.5% | ~31 ms |
+| **Sparse-Only (BM25)** | 75.0% | 75.0% | 81.2% | ~3 ms |
+| **Hybrid (FAISS + BM25 via RRF)** | 75.0% | 75.0% | 75.0% | ~23 ms |
+| **Hybrid + FlashRank Re-ranking** | **75.0%** | **75.0%** | **81.2%** | ~272 ms |
+
+> *Benchmark runs output full JSON reports to `benchmark_report.json`.*
+
+---
+
+## 📄 License
+This project is open-source under the [MIT License](LICENSE).
+
 

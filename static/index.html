@@ -427,7 +427,7 @@
 
             btn.disabled = true;
             btn.innerText = "Uploading & Indexing...";
-            statusDiv.className = "text-xs mt-1.5 text-center text-[#2563EB] block";
+            statusDiv.className = "text-xs mt-1.5 text-center text-[#2563EB] font-medium block";
             statusDiv.innerText = "Ingesting " + file.name + "...";
 
             try {
@@ -443,20 +443,61 @@
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.detail || 'Upload failed');
 
-                statusDiv.className = "text-xs mt-1.5 text-center text-[#16A34A] block";
-                statusDiv.innerText = "Indexed! Job ID: " + (data.job_id || 'OK');
+                const jobId = data.job_id;
                 fileInput.value = '';
-                setTimeout(() => {
-                    loadMetrics();
-                    loadDocuments();
-                    statusDiv.className = "hidden";
-                }, 3000);
+
+                // Poll job status until completed or failed
+                let attempts = 0;
+                const pollInterval = setInterval(async () => {
+                    attempts++;
+                    try {
+                        const jRes = await fetch('/api/pipeline/jobs', {
+                            headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': tenantId }
+                        });
+                        if (jRes.ok) {
+                            const jobs = await jRes.json();
+                            const currentJob = jobs.find(j => j.id === jobId);
+                            if (currentJob) {
+                                if (currentJob.status === 'completed') {
+                                    clearInterval(pollInterval);
+                                    statusDiv.className = "text-xs mt-1.5 text-center text-[#16A34A] font-semibold block";
+                                    statusDiv.innerText = "✓ Indexed successfully into Knowledge Base!";
+                                    btn.disabled = false;
+                                    btn.innerText = "Ingest & Index Vector Chunks";
+                                    loadMetrics();
+                                    loadDocuments();
+                                    setTimeout(() => { statusDiv.className = "hidden"; }, 4000);
+                                    return;
+                                } else if (currentJob.status === 'failed') {
+                                    clearInterval(pollInterval);
+                                    statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
+                                    statusDiv.innerText = "Failed: " + (currentJob.error_message || "Ingestion error");
+                                    btn.disabled = false;
+                                    btn.innerText = "Ingest & Index Vector Chunks";
+                                    return;
+                                } else {
+                                    statusDiv.innerText = `Processing: ${currentJob.progress_percent || 30}% (chunking & embedding)...`;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Poll error:", e);
+                    }
+
+                    if (attempts > 30) {
+                        clearInterval(pollInterval);
+                        btn.disabled = false;
+                        btn.innerText = "Ingest & Index Vector Chunks";
+                        loadMetrics();
+                        loadDocuments();
+                    }
+                }, 2000);
+
             } catch (err) {
                 statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
                 statusDiv.innerText = "Error: " + err.message;
-            } finally {
                 btn.disabled = false;
-                btn.innerText = "Ingest & Index";
+                btn.innerText = "Ingest & Index Vector Chunks";
             }
         }
     </script>

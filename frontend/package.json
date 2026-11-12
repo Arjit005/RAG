@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@tailwindcss/turbopack": "4.3.3",
     "@xyflow/react": "^12.12.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.72.0",
@@ -16,17 +17,16 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "recharts": "^3.10.1",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "4.3.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.0",
-    "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
-    "tailwindcss": "4.3.3",
     "typescript": "^5"
   }
 }

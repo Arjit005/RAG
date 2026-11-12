@@ -40,12 +40,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for external frontends
+# Setup CORS with explicit origin support
+frontend_origin = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+]
+if frontend_origin:
+    allowed_origins.append(frontend_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins if os.getenv("ENV") == "production" else ["*"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -57,9 +67,22 @@ def get_shared_vector_store() -> Optional[QdrantVectorStore]:
     global shared_qdrant_store
     if shared_qdrant_store is None:
         try:
-            shared_qdrant_store = QdrantVectorStore(collection_name="rag_enterprise_chunks", location="qdrant_storage")
+            q_url = os.getenv("QDRANT_URL")
+            q_key = os.getenv("QDRANT_API_KEY")
+            q_collection = os.getenv("QDRANT_COLLECTION", "rag_enterprise_chunks")
+            if q_url:
+                shared_qdrant_store = QdrantVectorStore(
+                    collection_name=q_collection,
+                    url=q_url,
+                    api_key=q_key
+                )
+            else:
+                shared_qdrant_store = QdrantVectorStore(
+                    collection_name=q_collection,
+                    location=os.getenv("QDRANT_LOCATION", "qdrant_storage")
+                )
         except Exception as e:
-            # When storage is locked by another process (e.g. during test runs against running server)
+            logger.warning(f"Failed to initialize shared QdrantVectorStore: {e}")
             return None
     return shared_qdrant_store
 
@@ -426,20 +449,69 @@ def root():
         "health": "/api/health"
     }
 
+@app.get("/api/health/live", tags=["General"])
+def liveness_probe():
+    """
+    Lightweight liveness probe for orchestrators (Render / Kubernetes).
+    Returns immediately without querying database or loading ML weights.
+    """
+    return {"status": "alive", "service": "rag-intelligence-backend"}
+
 @app.get("/api/health", response_model=HealthResponse, tags=["General"])
-def health_check():
-    engine = get_rag_engine()
-    data_dir = Path("data")
-    existing_docs = list(data_dir.glob("**/*.*")) if data_dir.exists() else []
-    
-    faiss_path = Path("faiss_store/faiss.index")
-    
+def health_check(db: Session = Depends(get_db)):
+    """
+    Comprehensive readiness check inspecting real infrastructure:
+    - Neon PostgreSQL connection
+    - Qdrant Vector Store readiness
+    - Model router availability
+    Fails with 503 if critical dependencies are down.
+    """
+    # 1. Check Neon PostgreSQL
+    db_healthy = False
+    try:
+        from sqlalchemy import text
+        val = db.execute(text("SELECT 1;")).scalar()
+        db_healthy = (val == 1)
+    except Exception as e:
+        logger.error(f"Health probe database error: {e}")
+        db_healthy = False
+
+    # 2. Check Qdrant Vector Store
+    vector_store_healthy = False
+    q_store = get_shared_vector_store()
+    if q_store and hasattr(q_store, "client"):
+        try:
+            q_coll = os.getenv("QDRANT_COLLECTION", "rag_enterprise_chunks")
+            q_store.client.get_collection(q_coll)
+            vector_store_healthy = True
+        except Exception as e:
+            logger.error(f"Health probe Qdrant error: {e}")
+            vector_store_healthy = False
+
+    # 3. Model Router Status
+    router = get_model_router()
+    models = router.registry
+    active_models_count = len([m for m in models if m.enabled and router.health_map.get(m.provider) and router.health_map[m.provider].state != CircuitState.OPEN])
+
+    is_overall_healthy = db_healthy and (vector_store_healthy or os.getenv("ENV") != "production")
+
+    if not is_overall_healthy:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "degraded",
+                "database_ready": db_healthy,
+                "vector_store_ready": vector_store_healthy,
+                "active_models_count": active_models_count
+            }
+        )
+
     return {
         "status": "healthy",
-        "indexed_documents_count": len(existing_docs),
-        "vector_store_ready": faiss_path.exists(),
-        "groq_llm_ready": engine.llm is not None,
-        "embedding_model": engine.embedding_model
+        "indexed_documents_count": db.query(Document).filter(Document.tenant_id == "default-tenant").count() if db_healthy else 0,
+        "vector_store_ready": vector_store_healthy,
+        "groq_llm_ready": active_models_count > 0,
+        "embedding_model": os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
     }
 
 # --- Authentication Endpoints ---

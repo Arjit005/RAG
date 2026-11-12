@@ -41,11 +41,20 @@ class QdrantVectorStore(BaseVectorStore):
         self._ranker = None
 
         # Connection strategy: URL/Host/Port or embedded local directory/in-memory
-        if url:
-            self.client = QdrantClient(url=url, api_key=api_key)
+        env = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
+        qdrant_url = url or os.getenv("QDRANT_URL")
+        qdrant_api_key = api_key or os.getenv("QDRANT_API_KEY")
+
+        if qdrant_url:
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
         elif host and port:
-            self.client = QdrantClient(host=host, port=port, api_key=api_key)
+            self.client = QdrantClient(host=host, port=port, api_key=qdrant_api_key)
         else:
+            if env in ("production", "prod"):
+                raise RuntimeError(
+                    "FATAL: QDRANT_URL is not configured in production environment. "
+                    "Production must connect to Qdrant Cloud and cannot silently use an ephemeral local directory."
+                )
             storage_loc = location or os.getenv("QDRANT_LOCATION", "./qdrant_storage")
             if storage_loc == ":memory:":
                 self.client = QdrantClient(location=":memory:")

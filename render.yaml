@@ -5,7 +5,7 @@ services:
   - type: web
     name: rag-intelligence-backend
     runtime: python
-    region: ohio # Close to Neon PostgreSQL (Ohio / us-east-2) for sub-5ms DB latency
+    region: ohio # Close to Neon PostgreSQL (Ohio / us-east-2)
     plan: standard # Minimum 2 GB RAM recommended for PyTorch + SentenceTransformers + FlashRank
     rootDir: .
     buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
@@ -16,11 +16,11 @@ services:
         value: 3.13.0
       - key: DATABASE_URL
         sync: false # Set in Render Dashboard: Neon pooled connection string
-      - key: JWT_SECRET
+      - key: JWT_SECRET_KEY
         generateValue: true # Securely generated 32+ char secret
       - key: JWT_ALGORITHM
         value: HS256
-      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+      - key: JWT_ACCESS_TOKEN_EXPIRE_MINUTES
         value: "1440"
       - key: VECTOR_STORE_TYPE
         value: qdrant
@@ -41,10 +41,7 @@ services:
       - key: DEFAULT_LLM_MODEL
         value: qwen/qwen3.8-27b
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: rag-intelligence-frontend
-          property: host
+        sync: false # Set in Render Dashboard to the public HTTPS frontend URL (e.g. https://rag-intelligence-frontend.onrender.com)
 
   # ---------------------------------------------------------------------------
   # 2. Next.js 16 Enterprise Frontend Service
@@ -61,6 +58,8 @@ services:
       - key: NODE_VERSION
         value: 20.18.0
       - key: NEXT_PUBLIC_API_URL
+        sync: false # Set in Render Dashboard to the public HTTPS backend URL (e.g. https://rag-intelligence-backend.onrender.com)
+      - key: BACKEND_INTERNAL_URL
         fromService:
           type: web
           name: rag-intelligence-backend

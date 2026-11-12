@@ -1,6 +1,11 @@
 import { MetricsSummary, DocumentItem, DocumentChunk, IngestionJob, SystemHealth, Citation, ModelsListResponse } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+// Use server-side BFF proxy (/api/proxy) by default in browser to leverage HttpOnly cookies
+// or fallback to NEXT_PUBLIC_API_URL if configured for direct connection
+const API_BASE_URL =
+  typeof window !== 'undefined' && !process.env.NEXT_PUBLIC_FORCE_DIRECT_API
+    ? '/api/proxy'
+    : process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 class ApiClient {
   private token: string | null = null;

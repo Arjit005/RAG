@@ -3,402 +3,441 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RAG Assistant</title>
-    <!-- Modern fonts -->
+    <title>RAG Intelligence — Enterprise Platform</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root {
-            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-            --glass-bg: rgba(255, 255, 255, 0.03);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --primary: #6366f1;
-            --primary-hover: #4f46e5;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent: #10b981;
-            --user-bubble: #312e81;
-            --bot-bubble: rgba(255, 255, 255, 0.05);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background: var(--bg-gradient);
-            color: var(--text-main);
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            overflow: hidden;
-        }
-
-        .chat-container {
-            width: 100%;
-            max-width: 850px;
-            height: 90vh;
-            background: var(--glass-bg);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid var(--glass-border);
-            border-radius: 28px;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-
-        .chat-header {
-            padding: 24px 32px;
-            border-bottom: 1px solid var(--glass-border);
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
-        .chat-header h1 {
-            font-family: 'Outfit', sans-serif;
-            font-size: 1.8rem;
-            font-weight: 700;
-            background: linear-gradient(to right, #818cf8, #34d399);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .chat-header .status {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background-color: var(--accent);
-            border-radius: 50%;
-            display: inline-block;
-            box-shadow: 0 0 8px var(--accent);
-        }
-
-        .chat-messages {
-            flex: 1;
-            padding: 32px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            scroll-behavior: smooth;
-        }
-
-        /* Custom scrollbar */
-        .chat-messages::-webkit-scrollbar {
-            width: 6px;
-        }
-        .chat-messages::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        .chat-messages::-webkit-scrollbar-thumb {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-        }
-
-        .message {
-            max-width: 80%;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            animation: messageFade 0.3s ease-out forwards;
-        }
-
-        @keyframes messageFade {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .message.user {
-            align-self: flex-end;
-        }
-
-        .message.bot {
-            align-self: flex-start;
-        }
-
-        .message-bubble {
-            padding: 16px 22px;
-            border-radius: 20px;
-            font-size: 1rem;
-            line-height: 1.55;
-            white-space: pre-wrap;
-        }
-
-        .user .message-bubble {
-            background: var(--primary);
-            color: #ffffff;
-            border-bottom-right-radius: 4px;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.25);
-        }
-
-        .bot .message-bubble {
-            background: var(--bot-bubble);
-            color: #e2e8f0;
-            border-bottom-left-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.03);
-        }
-
-        .message-sender {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .user .message-sender {
-            text-align: right;
-        }
-
-        /* Citations & Sources styling */
-        .message-sources {
-            margin-top: 8px;
-            padding: 12px 18px;
-            background: rgba(0, 0, 0, 0.15);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.04);
-        }
-
-        .sources-title {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--accent);
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .sources-list {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .source-tag {
-            font-size: 0.8rem;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--glass-border);
-            padding: 10px 14px;
-            border-radius: 8px;
-            color: #cbd5e1;
-        }
-
-        .chat-input-area {
-            padding: 24px 32px;
-            border-top: 1px solid var(--glass-border);
-            display: flex;
-            gap: 12px;
-        }
-
-        #question {
-            flex: 1;
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--glass-border);
-            border-radius: 16px;
-            padding: 16px 24px;
-            font-family: inherit;
-            color: var(--text-main);
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        #question:focus {
-            outline: none;
-            border-color: rgba(99, 102, 241, 0.4);
-            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
-            background: rgba(0, 0, 0, 0.3);
-        }
-
-        #send-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 16px;
-            padding: 16px 28px;
-            font-family: inherit;
-            font-weight: 600;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        #send-btn:hover {
-            background: var(--primary-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-        }
-
-        /* Typing Indicator Animation */
-        .typing-indicator {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-        }
-
-        .typing-dot {
-            width: 6px;
-            height: 6px;
-            background-color: var(--text-muted);
-            border-radius: 50%;
-            animation: typing 1.4s infinite ease-in-out both;
-        }
-
-        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-
-        @keyframes typing {
-            0%, 80%, 100% { transform: scale(0); }
-            40% { transform: scale(1.0); }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        code, pre { font-family: 'JetBrains Mono', monospace; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
         }
     </style>
 </head>
-<body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>RAG Assistant</h1>
-            <div class="status">
-                <span class="status-dot"></span>
-                Connected to Knowledge Base & Groq LLM
+<body class="bg-[#F8FAFC] text-[#0F172A] min-h-screen flex flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-[#E2E8F0] sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-bold text-xl shadow-sm">
+                    ⚡
+                </div>
+                <div>
+                    <h1 class="font-bold text-[#0F172A] text-lg leading-tight">RAG Intelligence</h1>
+                    <p class="text-xs text-[#64748B]">Enterprise Multimodal Research Platform</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="authStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA]">
+                    <span class="w-2 h-2 rounded-full bg-[#DC2626]"></span>
+                    <span id="authStatusText">Not Authenticated</span>
+                </div>
+                <button id="logoutBtn" onclick="logout()" class="hidden px-3 py-1.5 text-xs font-semibold text-[#DC2626] hover:bg-[#FEE2E2] rounded-lg border border-[#FECACA] transition-colors">
+                    Sign Out
+                </button>
             </div>
         </div>
+    </header>
 
-        <div class="chat-messages" id="chat-messages">
-            <div class="message bot">
-                <span class="message-sender">AI Assistant</span>
-                <div class="message-bubble">Hello! Ask me any question and I'll find the answers from the indexed documents.</div>
+    <!-- Main Container -->
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+        <!-- 1. LOGIN SECTION -->
+        <section id="loginSection" class="max-w-md mx-auto my-8">
+            <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-8">
+                <div class="mb-6 text-center">
+                    <h2 class="text-xl font-bold text-[#0F172A]">Welcome to Portfolio Demo</h2>
+                    <p class="text-sm text-[#64748B] mt-1">Sign in to query indexed enterprise documents.</p>
+                </div>
+
+                <div id="loginAlert" class="hidden mb-4 p-3 rounded-xl text-sm"></div>
+
+                <form onsubmit="handleLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-[#334155] uppercase tracking-wider mb-1">Email</label>
+                        <input type="email" id="loginEmail" required value="admin@enterprise.internal" class="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-[#334155] uppercase tracking-wider mb-1">Password</label>
+                        <input type="password" id="loginPassword" required value="EnterpriseAdmin2026!" class="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]">
+                    </div>
+                    <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium text-sm rounded-xl transition-colors shadow-sm">
+                        Sign In with Demo Account
+                    </button>
+                </form>
+
+                <div class="mt-6 pt-5 border-t border-[#F1F5F9] text-xs text-[#64748B]">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="font-semibold text-[#1E293B]">Demo Account:</span>
+                        <span class="text-[#2563EB] font-mono">admin@enterprise.internal</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="font-semibold text-[#1E293B]">Default Tenant:</span>
+                        <span class="text-[#059669] font-mono">default-tenant</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. DASHBOARD & RESEARCH WORKSPACE -->
+        <section id="workspaceSection" class="hidden space-y-6">
+
+            <!-- Metrics Overview Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
+                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Indexed Documents</div>
+                    <div id="metricDocs" class="text-2xl font-bold text-[#0F172A]">-</div>
+                    <div class="text-xs text-[#16A34A] mt-1 font-medium">PostgreSQL Neon DB</div>
+                </div>
+                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
+                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Vector Chunks</div>
+                    <div id="metricChunks" class="text-2xl font-bold text-[#0F172A]">-</div>
+                    <div class="text-xs text-[#2563EB] mt-1 font-medium">Qdrant Cloud (384-dim)</div>
+                </div>
+                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
+                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Embedding Model</div>
+                    <div class="text-sm font-bold text-[#0F172A] truncate" title="all-MiniLM-L6-v2">all-MiniLM-L6-v2</div>
+                    <div class="text-xs text-[#64748B] mt-1">Cosine Distance</div>
+                </div>
+                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
+                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Active LLM Router</div>
+                    <div id="metricLLM" class="text-sm font-bold text-[#0F172A]">Groq / Gemini</div>
+                    <div class="text-xs text-[#059669] mt-1 font-medium">Auto-Failover Active</div>
+                </div>
+            </div>
+
+            <!-- Two Column Layout: Chat and Document Knowledge Base -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+                <!-- Chat & Query Interface -->
+                <div class="lg:col-span-2 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col h-[600px]">
+                    <div class="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-[#0F172A]">AI Research Workspace</h3>
+                            <p class="text-xs text-[#64748B]">Hybrid Dense + BM25 Search with FlashRank Re-ranking</p>
+                        </div>
+                        <span class="px-2.5 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded-full text-xs font-medium">RAG Active</span>
+                    </div>
+
+                    <!-- Chat Messages List -->
+                    <div id="chatMessages" class="flex-1 p-6 overflow-y-auto space-y-4 text-sm">
+                        <div class="flex gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+                            <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#1E293B] max-w-[85%] leading-relaxed">
+                                Welcome! I am connected to your enterprise knowledge base. You can ask any question about the indexed research papers (like Self-Attention mechanism, Transformer architecture, embeddings, etc.).
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input Form -->
+                    <div class="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] rounded-b-2xl">
+                        <form onsubmit="submitQuestion(event)" class="flex gap-2">
+                            <input type="text" id="chatInput" placeholder="Ask a question grounded in verified documents..." class="flex-1 px-4 py-2.5 bg-white border border-[#CBD5E1] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]">
+                            <button type="submit" id="chatSendBtn" class="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-1.5 shrink-0">
+                                <span>Send</span>
+                                <span>→</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Document Inventory Sidebar -->
+                <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col h-[600px]">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-[#F1F5F9]">
+                        <h3 class="font-bold text-[#0F172A]">Knowledge Base</h3>
+                        <span id="docCountBadge" class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded">0 Docs</span>
+                    </div>
+
+                    <!-- Document List Container -->
+                    <div id="docsList" class="flex-1 overflow-y-auto space-y-2 text-xs">
+                        <div class="text-[#94A3B8] text-center py-8">Loading document inventory...</div>
+                    </div>
+
+                    <!-- Direct Upload Form -->
+                    <div class="mt-4 pt-4 border-t border-[#F1F5F9]">
+                        <label class="block text-xs font-semibold text-[#334155] mb-2">Upload Document (.pdf, .txt)</label>
+                        <input type="file" id="fileUploadInput" accept=".pdf,.txt,.docx,.md" class="block w-full text-xs text-[#64748B] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EEF2FF] file:text-[#4F46E5] hover:file:bg-[#E0E7FF] cursor-pointer">
+                        <button onclick="handleFileUpload()" id="uploadBtn" class="w-full mt-2 py-2 px-3 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-lg text-xs font-medium transition-colors">
+                            Ingest & Index
+                        </button>
+                        <div id="uploadStatus" class="text-xs mt-1.5 text-center hidden"></div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-[#E2E8F0] py-4 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-[#64748B] flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>RAG Intelligence Enterprise Portfolio Edition • Render Free Deployment</div>
+            <div class="flex items-center gap-4">
+                <a href="/docs" target="_blank" class="hover:text-[#2563EB] transition-colors">API Docs (/docs)</a>
+                <a href="/api/health" target="_blank" class="hover:text-[#2563EB] transition-colors">System Health (/api/health)</a>
             </div>
         </div>
-
-        <div class="chat-input-area">
-            <input id="question" type="text" placeholder="Ask a question..." onkeydown="if(event.key === 'Enter') askQuestion()">
-            <button id="send-btn" onclick="askQuestion()">
-                <span>Ask</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                </svg>
-            </button>
-        </div>
-    </div>
+    </footer>
 
     <script>
-        const chatMessages = document.getElementById("chat-messages");
+        let token = localStorage.getItem('rag_token') || null;
+        let tenantId = localStorage.getItem('rag_tenant_id') || 'default-tenant';
 
-        function appendMessage(sender, text, isUser = false, citations = []) {
-            const messageDiv = document.createElement("div");
-            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+        window.addEventListener('DOMContentLoaded', () => {
+            if (token) {
+                showWorkspace();
+                loadMetrics();
+                loadDocuments();
+            } else {
+                showLogin();
+            }
+        });
 
-            let sourcesHtml = "";
-            if (citations && citations.length > 0) {
-                sourcesHtml = `
-                    <div class="message-sources">
-                        <div class="sources-title">📚 Sources</div>
-                        <div class="sources-list">
-                            ${citations.map(c => {
-                                let imgHtml = "";
-                                if (c.type === "image" && c.image_url) {
-                                    imgHtml = `
-                                        <div style="margin-top: 8px;">
-                                            <img src="${c.image_url}" style="max-width: 100%; max-height: 250px; border-radius: 8px; border: 1px solid var(--glass-border); display: block;" alt="Source image page ${c.page}"/>
-                                        </div>
-                                    `;
-                                }
-                                return `
-                                    <div class="source-tag">
-                                        <div style="display: flex; justify-content: space-between; font-weight: 600; color: var(--accent); margin-bottom: 4px;">
-                                            <span>📄 ${c.source} — Page ${c.page}</span>
-                                            <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">${c.type || 'text'}</span>
-                                        </div>
-                                        <div style="font-size: 0.75rem; color: #94a3b8; line-height: 1.4; word-break: break-word;">${c.snippet || ''}</div>
-                                        ${imgHtml}
-                                    </div>
-                                `;
-                            }).join('')}
+        function showLogin() {
+            document.getElementById('loginSection').classList.remove('hidden');
+            document.getElementById('workspaceSection').classList.add('hidden');
+            document.getElementById('logoutBtn').classList.add('hidden');
+            const badge = document.getElementById('authStatusBadge');
+            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA]";
+            document.getElementById('authStatusText').innerText = "Not Authenticated";
+        }
+
+        function showWorkspace() {
+            document.getElementById('loginSection').classList.add('hidden');
+            document.getElementById('workspaceSection').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.remove('hidden');
+            const badge = document.getElementById('authStatusBadge');
+            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]";
+            document.getElementById('authStatusText').innerText = "Authenticated (" + tenantId + ")";
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const btn = document.getElementById('loginSubmitBtn');
+            const alert = document.getElementById('loginAlert');
+
+            btn.disabled = true;
+            btn.innerText = "Signing in...";
+            alert.className = "hidden";
+
+            try {
+                const res = await fetch('/api/auth/token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || "Authentication failed");
+                }
+
+                token = data.access_token;
+                tenantId = data.tenant_id || 'default-tenant';
+                localStorage.setItem('rag_token', token);
+                localStorage.setItem('rag_tenant_id', tenantId);
+
+                showWorkspace();
+                loadMetrics();
+                loadDocuments();
+            } catch (err) {
+                alert.className = "mb-4 p-3 rounded-xl text-sm bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] block";
+                alert.innerText = "Error: " + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Sign In with Demo Account";
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('rag_token');
+            localStorage.removeItem('rag_tenant_id');
+            token = null;
+            showLogin();
+        }
+
+        async function loadMetrics() {
+            try {
+                const res = await fetch('/api/metrics/summary', {
+                    headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': tenantId }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('metricDocs').innerText = data.total_documents || 0;
+                    document.getElementById('metricChunks').innerText = data.total_chunks || 0;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function loadDocuments() {
+            const list = document.getElementById('docsList');
+            try {
+                const res = await fetch('/api/documents', {
+                    headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': tenantId }
+                });
+                if (!res.ok) throw new Error('Failed to load documents');
+                const docs = await res.json();
+                document.getElementById('docCountBadge').innerText = docs.length + ' Docs';
+
+                if (docs.length === 0) {
+                    list.innerHTML = '<div class="text-[#94A3B8] text-center py-6">No documents indexed yet.</div>';
+                    return;
+                }
+
+                list.innerHTML = docs.map(d => `
+                    <div class="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl hover:border-[#CBD5E1] transition-colors">
+                        <div class="font-semibold text-[#0F172A] truncate" title="${d.filename}">📄 ${d.filename}</div>
+                        <div class="flex items-center justify-between text-[#64748B] text-[11px] mt-1">
+                            <span>Chunks: ${d.chunks_count || d.page_count}</span>
+                            <span class="px-1.5 py-0.5 rounded bg-white border border-[#E2E8F0] text-[#059669] font-medium">${d.status}</span>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                list.innerHTML = `<div class="text-[#DC2626] text-center py-4">Error loading documents.</div>`;
+            }
+        }
+
+        async function submitQuestion(e) {
+            e.preventDefault();
+            const input = document.getElementById('chatInput');
+            const q = input.value.trim();
+            if (!q) return;
+
+            input.value = '';
+            const messages = document.getElementById('chatMessages');
+
+            // User Message
+            messages.innerHTML += `
+                <div class="flex gap-3 justify-end">
+                    <div class="bg-[#2563EB] text-white rounded-2xl p-4 max-w-[85%] leading-relaxed shadow-xs">
+                        ${q}
+                    </div>
+                </div>
+            `;
+            messages.scrollTop = messages.scrollHeight;
+
+            // Loading state
+            const loadingId = 'loading-' + Date.now();
+            messages.innerHTML += `
+                <div id="${loadingId}" class="flex gap-3">
+                    <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+                    <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#64748B] animate-pulse">
+                        Searching hybrid vector index & synthesizing evidence...
+                    </div>
+                </div>
+            `;
+            messages.scrollTop = messages.scrollHeight;
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token,
+                        'X-Tenant-ID': tenantId
+                    },
+                    body: JSON.stringify({ message: q, top_k: 4 })
+                });
+
+                document.getElementById(loadingId).remove();
+                const data = await res.json();
+
+                let citationsHtml = '';
+                if (data.citations && data.citations.length > 0) {
+                    citationsHtml = `
+                        <div class="mt-3 pt-3 border-t border-[#E2E8F0]/60">
+                            <div class="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Verified Evidence & Citations</div>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${data.citations.map(c => `
+                                    <span class="px-2 py-0.5 bg-white border border-[#CBD5E1] rounded text-[11px] font-mono text-[#334155]" title="${c.snippet}">
+                                        ${c.filename} (Score: ${(c.relevance_score || 0).toFixed(2)})
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                messages.innerHTML += `
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
+                        <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#1E293B] max-w-[85%] leading-relaxed">
+                            <div class="whitespace-pre-wrap">${data.response}</div>
+                            ${citationsHtml}
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                messages.innerHTML += `
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-[#DC2626] text-white flex items-center justify-center font-bold text-xs shrink-0">!</div>
+                        <div class="bg-[#FEF2F2] border border-[#FECACA] rounded-2xl p-4 text-[#991B1B] max-w-[85%]">
+                            Error querying RAG: ${err.message}
                         </div>
                     </div>
                 `;
             }
-
-            messageDiv.innerHTML = `
-                <span class="message-sender">${sender}</span>
-                <div class="message-bubble">${text}</div>
-                ${sourcesHtml}
-            `;
-
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            return messageDiv;
+            messages.scrollTop = messages.scrollHeight;
         }
 
-        async function askQuestion() {
-            const questionInput = document.getElementById("question");
-            const question = questionInput.value.trim();
-            if (!question) return;
+        async function handleFileUpload() {
+            const fileInput = document.getElementById('fileUploadInput');
+            const statusDiv = document.getElementById('uploadStatus');
+            const btn = document.getElementById('uploadBtn');
 
-            // Clear input field
-            questionInput.value = "";
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select a file to upload.');
+                return;
+            }
 
-            // Append user question
-            appendMessage("User", question, true);
+            const file = fileInput.files[0];
+            const formData = new FormData();
+            formData.append('file', file);
 
-            // Append bot thinking indicator
-            const thinkingDiv = document.createElement("div");
-            thinkingDiv.className = "message bot";
-            thinkingDiv.innerHTML = `
-                <span class="message-sender">AI Assistant</span>
-                <div class="message-bubble">
-                    <div class="typing-indicator">
-                        <div class="typing-dot"></div>
-                        <div class="typing-dot"></div>
-                        <div class="typing-dot"></div>
-                    </div>
-                </div>
-            `;
-            chatMessages.appendChild(thinkingDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
+            btn.disabled = true;
+            btn.innerText = "Uploading & Indexing...";
+            statusDiv.className = "text-xs mt-1.5 text-center text-[#2563EB] block";
+            statusDiv.innerText = "Ingesting " + file.name + "...";
 
             try {
-                const response = await fetch(
-                    `/ask?question=${encodeURIComponent(question)}&top_k=3`
-                );
-                const data = await response.json();
+                const res = await fetch('/api/documents/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'X-Tenant-ID': tenantId
+                    },
+                    body: formData
+                });
 
-                // Remove thinking indicator
-                chatMessages.removeChild(thinkingDiv);
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Upload failed');
 
-                if (!response.ok) {
-                    throw new Error(data.detail || "Request failed");
-                }
-
-                // Append AI response
-                appendMessage("AI Assistant", data.answer || "No answer returned.", false, data.citations);
-
-            } catch (error) {
-                // Remove thinking indicator
-                if (chatMessages.contains(thinkingDiv)) {
-                    chatMessages.removeChild(thinkingDiv);
-                }
-                appendMessage("AI Assistant", "Error: " + error.message, false);
+                statusDiv.className = "text-xs mt-1.5 text-center text-[#16A34A] block";
+                statusDiv.innerText = "Indexed! Job ID: " + (data.job_id || 'OK');
+                fileInput.value = '';
+                setTimeout(() => {
+                    loadMetrics();
+                    loadDocuments();
+                    statusDiv.className = "hidden";
+                }, 3000);
+            } catch (err) {
+                statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
+                statusDiv.innerText = "Error: " + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Ingest & Index";
             }
         }
     </script>

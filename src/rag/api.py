@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Header, Depends, BackgroundTasks, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.orm import Session
@@ -42,6 +43,11 @@ app = FastAPI(
     description="Production REST API for Document Intelligence, Hybrid Vector Search, and Groq LLM Querying.",
     version="1.0.0"
 )
+
+# Mount static web directory
+static_dir = Path(__file__).resolve().parent.parent.parent / "static"
+if static_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Setup CORS with explicit origin support
 env_mode = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
@@ -450,6 +456,9 @@ def process_document_ingestion_job(
 
 @app.get("/", tags=["General"])
 def root():
+    index_file = static_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(str(index_file))
     return {
         "message": "Welcome to RAG Intelligence Enterprise API 🚀",
         "documentation": "/docs",

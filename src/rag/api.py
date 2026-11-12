@@ -470,6 +470,10 @@ def debug_db_check():
     db_url = os.getenv("DATABASE_URL", "NOT_SET")
     from src.rag.db.database import mask_connection_url, SessionLocal
     masked_url = mask_connection_url(db_url)
+    
+    # List all set environment variable keys (without values for security)
+    set_keys = [k for k in os.environ.keys() if not k.startswith("_")]
+    
     try:
         db = SessionLocal()
         u = db.query(User).filter(User.email == "admin@enterprise.internal").first()
@@ -482,12 +486,14 @@ def debug_db_check():
         return {
             "status": "ok",
             "masked_url": masked_url,
+            "set_env_keys": set_keys,
             "user": user_info
         }
     except Exception as e:
         return {
             "status": "error",
             "masked_url": masked_url,
+            "set_env_keys": set_keys,
             "error": str(e),
             "type": type(e).__name__
         }

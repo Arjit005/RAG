@@ -464,6 +464,34 @@ def liveness_probe():
     """
     return {"status": "live", "service": "rag-intelligence-backend"}
 
+@app.get("/api/debug/db-check", tags=["General"])
+def debug_db_check():
+    """Diagnostic endpoint to inspect live database connectivity."""
+    db_url = os.getenv("DATABASE_URL", "NOT_SET")
+    from src.rag.db.database import mask_connection_url, SessionLocal
+    masked_url = mask_connection_url(db_url)
+    try:
+        db = SessionLocal()
+        u = db.query(User).filter(User.email == "admin@enterprise.internal").first()
+        user_info = {
+            "found": bool(u),
+            "email": u.email if u else None,
+            "has_pwd": bool(u.hashed_password) if u else False
+        }
+        db.close()
+        return {
+            "status": "ok",
+            "masked_url": masked_url,
+            "user": user_info
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "masked_url": masked_url,
+            "error": str(e),
+            "type": type(e).__name__
+        }
+
 @app.get("/api/health", response_model=HealthResponse, tags=["General"])
 def health_check(db: Session = Depends(get_db)):
     """

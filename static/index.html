@@ -362,11 +362,14 @@
                         'Authorization': 'Bearer ' + token,
                         'X-Tenant-ID': tenantId
                     },
-                    body: JSON.stringify({ message: q, top_k: 4 })
+                    body: JSON.stringify({ query: q, top_k: 4 })
                 });
 
                 document.getElementById(loadingId).remove();
                 const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || 'Chat request failed');
+                }
 
                 let citationsHtml = '';
                 if (data.citations && data.citations.length > 0) {

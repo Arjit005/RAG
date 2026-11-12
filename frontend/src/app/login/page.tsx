@@ -23,8 +23,8 @@ export default function LoginPage() {
       setLoading(true);
       setError(null);
       await api.login(email.trim(), password);
-      router.push('/');
-      router.refresh();
+      // Hard navigation to ensure cookies are fresh for the layout and middleware
+      window.location.href = '/';
     } catch (err: any) {
       setError(err.message || 'Invalid email or password.');
     } finally {

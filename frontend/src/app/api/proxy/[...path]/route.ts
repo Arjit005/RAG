@@ -10,8 +10,11 @@ function getBackendUrl(): string {
     }
     return `http://${internal.replace(/\/$/, '')}`;
   }
-  // Fallback to NEXT_PUBLIC_API_URL or local development
-  return (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+  const publicApi = process.env.NEXT_PUBLIC_API_URL;
+  if (publicApi) {
+    return publicApi.replace(/\/$/, '');
+  }
+  return 'http://127.0.0.1:8000';
 }
 
 const BACKEND_URL = getBackendUrl();
@@ -67,6 +70,7 @@ async function forwardRequest(req: NextRequest, method: string) {
     );
   }
 
+  const backendUrl = getBackendUrl();
   const url = new URL(req.url);
   // Strip '/api/proxy' and forward to backend
   // Note: incoming path is like /api/proxy/api/documents or /api/proxy/documents
@@ -78,7 +82,7 @@ async function forwardRequest(req: NextRequest, method: string) {
   if (!cleanPath.startsWith('/api')) {
     cleanPath = `/api${cleanPath}`;
   }
-  const targetUrl = `${BACKEND_URL}${cleanPath}${url.search}`;
+  const targetUrl = `${backendUrl}${cleanPath}${url.search}`;
 
   const headers = new Headers();
   req.headers.forEach((val, key) => {

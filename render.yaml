@@ -1,0 +1,67 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. FastAPI Multi-Tenant Backend Service
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: rag-intelligence-backend
+    runtime: python
+    region: ohio # Close to Neon PostgreSQL (Ohio / us-east-2) for sub-5ms DB latency
+    plan: standard # Minimum 2 GB RAM recommended for PyTorch + SentenceTransformers + FlashRank
+    rootDir: .
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn src.rag.api:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: DATABASE_URL
+        sync: false # Set in Render Dashboard: Neon pooled connection string
+      - key: JWT_SECRET
+        generateValue: true # Securely generated 32+ char secret
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: VECTOR_STORE_TYPE
+        value: qdrant
+      - key: QDRANT_URL
+        sync: false # Set in Render Dashboard: Qdrant Cloud cluster URL
+      - key: QDRANT_API_KEY
+        sync: false # Set in Render Dashboard: Qdrant Cloud API Key
+      - key: QDRANT_COLLECTION
+        value: rag_enterprise_chunks
+      - key: GROQ_API_KEY
+        sync: false # Set in Render Dashboard
+      - key: GEMINI_API_KEY
+        sync: false # Set in Render Dashboard
+      - key: OPENROUTER_API_KEY
+        sync: false # Set in Render Dashboard
+      - key: EMBEDDING_MODEL
+        value: all-MiniLM-L6-v2
+      - key: DEFAULT_LLM_MODEL
+        value: qwen/qwen3.8-27b
+      - key: FRONTEND_URL
+        fromService:
+          type: web
+          name: rag-intelligence-frontend
+          property: host
+
+  # ---------------------------------------------------------------------------
+  # 2. Next.js 16 Enterprise Frontend Service
+  # ---------------------------------------------------------------------------
+  - type: web
+    name: rag-intelligence-frontend
+    runtime: node
+    region: ohio
+    plan: starter # 512 MB is sufficient for Next.js SSR / Node
+    rootDir: frontend
+    buildCommand: "npm ci && npm run build"
+    startCommand: "npm run start"
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: rag-intelligence-backend
+          property: host

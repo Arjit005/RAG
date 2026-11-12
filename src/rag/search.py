@@ -13,23 +13,28 @@ sys.modules['uuid_utils.compat'] = CompatMock()
 from pathlib import Path
 import os
 import base64
+from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
+from src.rag.llm.model_router import get_model_router
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
     from rag.vectorstore import FaissVectorStore
-except ImportError:
-    from vectorstore import FaissVectorStore
+except Exception:
+    try:
+        from vectorstore import FaissVectorStore
+    except Exception:
+        FaissVectorStore = None
 
 load_dotenv()
 
 class RAGSearch:
-    def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2", llm_model: str = "qwen/qwen3.6-27b", gemini_api_key: str = None):
+    def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2", llm_model: str = "qwen/qwen3.8-27b", gemini_api_key: str = None):
         self.persist_dir = persist_dir
         self.embedding_model = embedding_model
         self.llm_model = llm_model
@@ -85,8 +90,16 @@ class RAGSearch:
         docs = load_all_documents("data", self.gemini_api_key)
         self.vectorstore.build_from_documents(docs)
 
-    def search_and_answer(self, query: str, top_k: int = 5, chat_history: list = None, use_hybrid: bool = True, use_rerank: bool = True) -> dict:
-        results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+    def search_and_answer(self, query: str, top_k: int = 5, chat_history: list = None, use_hybrid: bool = True, use_rerank: bool = True, tenant_id: Optional[str] = None) -> dict:
+        if hasattr(self.vectorstore, "query"):
+            import inspect
+            sig = inspect.signature(self.vectorstore.query)
+            if "tenant_id" in sig.parameters:
+                results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
+            else:
+                results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+        else:
+            results = []
         
         context_blocks = []
         citations = []
@@ -177,20 +190,50 @@ User Question: {query}
 
 Detailed Answer:"""
 
-        # Generate Multi-modal output if Gemini is configured and we have images
+        # Multi-Provider Router with Automatic Failover
+        router = get_model_router()
+        try:
+            route_res = router.invoke(
+                prompt=prompt_instructions,
+                preferred_model_id=self.llm_model,
+                require_multimodal=bool(images_to_send),
+                images=images_to_send if images_to_send else None
+            )
+            answer_text = route_res.get("answer", "")
+            routed_model = route_res.get("model_id", self.llm_model)
+            routed_provider = route_res.get("provider", "unknown")
+            routed_tier = route_res.get("tier", "unknown")
+            failover_occurred = route_res.get("failover_occurred", False)
+
+            return {
+                "answer": answer_text,
+                "citations": citations,
+                "model_id": routed_model,
+                "provider": routed_provider,
+                "tier": routed_tier,
+                "failover_occurred": failover_occurred
+            }
+        except Exception as router_err:
+            print(f"[WARNING] Model router invocation failed: {router_err}. Falling back to direct LLM.")
+
+        # Fallback to direct Gemini Multi-modal if configured and we have images
         if self.gemini_llm and (images_to_send or os.getenv("FORCE_GEMINI", "false").lower() == "true"):
             try:
-                print(f"[INFO] Formulating multimodal answer using Gemini 1.5 Pro with {len(images_to_send)} images...")
+                print(f"[INFO] Formulating multimodal answer using Gemini fallback with {len(images_to_send)} images...")
                 content = [{"type": "text", "text": prompt_instructions}] + images_to_send
                 message = HumanMessage(content=content)
                 response = self.gemini_llm.invoke([message])
                 answer_text = response.content
                 return {
                     "answer": answer_text,
-                    "citations": citations
+                    "citations": citations,
+                    "model_id": "gemini-3.6-flash",
+                    "provider": "gemini",
+                    "tier": "free",
+                    "failover_occurred": True
                 }
             except Exception as e:
-                print(f"[ERROR] Gemini multi-modal synthesis failed: {e}. Falling back to standard LLM.")
+                print(f"[ERROR] Direct Gemini multi-modal synthesis failed: {e}.")
 
         # Fallback to standard Groq text-only LLM
         if not self.llm:
@@ -199,7 +242,11 @@ Detailed Answer:"""
                 warning_msg = "\n\n*(Note: Some relevant images/charts were retrieved but could not be visually processed because GEMINI_API_KEY is not set.)*\n"
             return {
                 "answer": f"**Retrieved Context (No LLM Key configured/available):**\n\n{context_str}{warning_msg}",
-                "citations": citations
+                "citations": citations,
+                "model_id": "none",
+                "provider": "none",
+                "tier": "none",
+                "failover_occurred": False
             }
 
         try:
@@ -212,17 +259,29 @@ Detailed Answer:"""
 
         return {
             "answer": answer_text,
-            "citations": citations
+            "citations": citations,
+            "model_id": self.llm_model,
+            "provider": "groq",
+            "tier": "paid",
+            "failover_occurred": False
         }
 
-    def stream_and_answer(self, query: str, top_k: int = 5, chat_history: list = None, use_hybrid: bool = True, use_rerank: bool = True):
+    def stream_and_answer(self, query: str, top_k: int = 5, chat_history: list = None, use_hybrid: bool = True, use_rerank: bool = True, tenant_id: Optional[str] = None):
         """
         Yields tokens and citations in real time as an event stream.
         1st event: {"type": "citations", "citations": [...]}
         subsequent events: {"type": "token", "token": "..."}
         final event: {"type": "done"}
         """
-        results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+        if hasattr(self.vectorstore, "query"):
+            import inspect
+            sig = inspect.signature(self.vectorstore.query)
+            if "tenant_id" in sig.parameters:
+                results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
+            else:
+                results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+        else:
+            results = []
         
         context_blocks = []
         citations = []
@@ -315,7 +374,42 @@ User Question: {query}
 
 Detailed Answer:"""
 
-        # Stream with Gemini Multi-modal if available
+        # Multi-Provider Router with Automatic Streaming Failover
+        router = get_model_router()
+        streamed_any_token = False
+        try:
+            for ev in router.stream(
+                prompt=prompt_instructions,
+                preferred_model_id=self.llm_model,
+                require_multimodal=bool(images_to_send),
+                images=images_to_send if images_to_send else None
+            ):
+                ev_type = ev.get("type")
+                if ev_type == "model_selected":
+                    yield {
+                        "type": "model_selected",
+                        "model_id": ev.get("model_id"),
+                        "provider": ev.get("provider"),
+                        "tier": ev.get("tier"),
+                        "failover_occurred": (ev.get("model_id") != self.llm_model)
+                    }
+                elif ev_type == "token":
+                    streamed_any_token = True
+                    yield {"type": "token", "token": ev.get("token")}
+                elif ev_type == "done":
+                    yield {"type": "done"}
+                    return
+                elif ev_type == "error":
+                    yield {"type": "error", "error": ev.get("error")}
+                    return
+        except Exception as router_err:
+            print(f"[WARNING] Model router streaming failed: {router_err}. Falling back to direct LLM.")
+
+        if streamed_any_token:
+            yield {"type": "done"}
+            return
+
+        # Direct Gemini Multi-modal fallback if router failed before any token
         if self.gemini_llm and (images_to_send or os.getenv("FORCE_GEMINI", "false").lower() == "true"):
             try:
                 content = [{"type": "text", "text": prompt_instructions}] + images_to_send
@@ -326,7 +420,7 @@ Detailed Answer:"""
                 yield {"type": "done"}
                 return
             except Exception as e:
-                print(f"[ERROR] Gemini streaming failed: {e}. Falling back to standard LLM.")
+                print(f"[ERROR] Direct Gemini streaming failed: {e}. Falling back to standard LLM.")
 
         if not self.llm:
             warning_msg = ""

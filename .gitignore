@@ -4,3 +4,25 @@ __pycache__/
 .pytest_cache/
 *.pyc
 .env
+.env.*
+!.env.example
+
+# Local databases and backups
+*.db
+*.db-journal
+*.bak
+faiss_store_backup/
+qdrant_storage/
+
+# Logs
+*.log
+uvicorn_err.log
+uvicorn_out.log
+streamlit_err.log
+streamlit_out.log
+
+# Node & Next.js build artifacts
+frontend/node_modules/
+frontend/.next/
+frontend/test-results/
+frontend/playwright-report/

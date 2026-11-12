@@ -3,8 +3,8 @@ fileWatcherType = "none"
 headless = true
 
 [theme]
-primaryColor = "#6366f1"
-backgroundColor = "#0f172a"
-secondaryBackgroundColor = "#1e293b"
-textColor = "#f8fafc"
+primaryColor = "#2563EB"
+backgroundColor = "#F7F9FC"
+secondaryBackgroundColor = "#F1F5F9"
+textColor = "#172B4D"
 font = "sans serif"

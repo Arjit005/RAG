@@ -547,6 +547,21 @@ def login_for_access_token(req: LoginRequest, db: Session = Depends(get_db)):
         "role": user.role
     }
 
+@app.get("/api/auth/me", tags=["Authentication"])
+def get_auth_me(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """
+    Returns verified user context for the active session.
+    Used by frontend session guards and profile headers.
+    """
+    return {
+        "authenticated": True,
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "tenant_id": current_user.tenant_id,
+        "role": current_user.role
+    }
+
+
 # --- Authenticated Document Management & Ingestion (Phase F4) ---
 
 @app.get("/api/documents", response_model=List[DocumentSchema], tags=["Documents"])

@@ -2,7 +2,8 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { api } from '@/lib/api';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -15,6 +16,7 @@ import {
   ChevronRight,
   Shield,
   Zap,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +36,17 @@ const navOperations = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+      router.push('/login');
+      router.refresh();
+    } catch {
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <aside className="w-64 bg-[#F1F5F9] border-r border-[#E2E8F0] flex flex-col h-screen fixed left-0 top-0 z-30 select-none">
@@ -105,8 +118,8 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="p-4 border-t border-[#E2E8F0] bg-white text-xs text-[#64748B] space-y-1">
+      {/* Footer Info & Logout */}
+      <div className="p-4 border-t border-[#E2E8F0] bg-white text-xs text-[#64748B] space-y-2">
         <div className="flex items-center justify-between">
           <span className="font-semibold text-[#172B4D]">Tenant:</span>
           <span className="px-1.5 py-0.5 bg-[#F1F5F9] rounded text-[11px] font-mono">default-tenant</span>
@@ -121,6 +134,13 @@ export function Sidebar() {
           <span>Cluster:</span>
           <span className="truncate max-w-[110px]" title="Neon AWS us-east-2">Neon us-east-2</span>
         </div>
+        <button
+          onClick={handleLogout}
+          className="w-full mt-2 pt-2 border-t border-[#F1F5F9] flex items-center justify-center gap-2 py-2 px-3 bg-[#FEF2F2] hover:bg-[#FEE2E2] text-[#DC2626] rounded-lg font-medium transition-colors cursor-pointer"
+        >
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   );

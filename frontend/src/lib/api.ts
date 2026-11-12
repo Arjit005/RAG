@@ -88,6 +88,20 @@ class ApiClient {
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   }
 
+  public async getMe(): Promise<{ authenticated: boolean; user_id: string; email: string; tenant_id: string; role: string }> {
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) {
+      throw new Error('Unauthenticated');
+    }
+    const data = await res.json();
+    if (data.tenant_id) {
+      this.setTenantId(data.tenant_id);
+    }
+    return data;
+  }
+
   public async getHealth(): Promise<SystemHealth> {
     const res = await fetch(`${API_BASE_URL}/api/health`, {
       headers: this.headers(),

@@ -6,10 +6,10 @@ services:
     name: rag-intelligence-backend
     runtime: python
     region: ohio # Close to Neon PostgreSQL (Ohio / us-east-2)
-    plan: standard # Minimum 2 GB RAM recommended for PyTorch + SentenceTransformers + FlashRank
+    plan: free # Free tier plan
     rootDir: .
     buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
-    startCommand: "uvicorn src.rag.api:app --host 0.0.0.0 --port $PORT"
+    startCommand: "python scripts/provision_demo_user.py && uvicorn src.rag.api:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /api/health/live
     envVars:
       - key: PYTHON_VERSION
@@ -18,6 +18,10 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false # Set in Render Dashboard: Neon pooled connection string
+      - key: DEMO_USER_EMAIL
+        value: admin@enterprise.internal
+      - key: DEMO_USER_PASSWORD
+        sync: false # Set in Render Dashboard (or defaults to EnterpriseAdmin2026!)
       - key: JWT_SECRET_KEY
         generateValue: true # Securely generated 32+ char secret
       - key: JWT_ALGORITHM
@@ -52,7 +56,7 @@ services:
     name: rag-intelligence-frontend
     runtime: node
     region: ohio
-    plan: starter # 512 MB is sufficient for Next.js SSR / Node
+    plan: free # Free tier plan
     rootDir: frontend
     buildCommand: "npm ci && npm run build"
     startCommand: "npm run start"

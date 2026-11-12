@@ -1,15 +1,23 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Next.js Enterprise Multimodal RAG Application', () => {
-  test.beforeEach(async ({ page }) => {
+  const TEST_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLWFkbWluLWRlZmF1bHQiLCJlbWFpbCI6ImFkbWluQGVudGVycHJpc2UuaW50ZXJuYWwiLCJ0ZW5hbnRfaWQiOiJkZWZhdWx0LXRlbmFudCIsInJvbGUiOiJzeXN0ZW1fYWRtaW4iLCJleHAiOjE3OTQ1NTIwOTAsImlhdCI6MTc5NDQ2NTY5MCwiaXNzIjoicmFnLWludGVsbGlnZW5jZS1hcGkifQ.udz0XPMVfRvsWPSK4NB2ze3ZOkTDOtecEccRKQWEwU0';
+
+  test.beforeEach(async ({ context, page }) => {
+    await context.addCookies([
+      {
+        name: 'rag_session',
+        value: TEST_TOKEN,
+        domain: 'localhost',
+        path: '/',
+        httpOnly: true,
+        sameSite: 'Lax',
+      },
+    ]);
     await page.goto('http://localhost:3001');
-    await page.evaluate(() => {
-      localStorage.setItem(
-        'rag_token',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLWFkbWluLWRlZmF1bHQiLCJlbWFpbCI6ImFkbWluQGVudGVycHJpc2UuaW50ZXJuYWwiLCJ0ZW5hbnRfaWQiOiJkZWZhdWx0LXRlbmFudCIsInJvbGUiOiJzeXN0ZW1fYWRtaW4iLCJleHAiOjE4MjU5OTI2NDEsImlhdCI6MTc5NDQ1NjY0MSwiaXNzIjoicmFnLWludGVsbGlnZW5jZS1hcGkifQ.PoeE1jCGCoiZ3jRTU_wB-aLN34j7qv6N7xj-pi87LDs'
-      );
+    await page.evaluate((tok) => {
       localStorage.setItem('rag_tenant_id', 'default-tenant');
-    });
+    }, TEST_TOKEN);
     await page.reload();
   });
 

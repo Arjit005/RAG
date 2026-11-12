@@ -10,10 +10,12 @@ services:
     rootDir: .
     buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
     startCommand: "uvicorn src.rag.api:app --host 0.0.0.0 --port $PORT"
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/live
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.0
+      - key: ENV
+        value: production
       - key: DATABASE_URL
         sync: false # Set in Render Dashboard: Neon pooled connection string
       - key: JWT_SECRET_KEY
@@ -57,10 +59,14 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 20.18.0
+      - key: NODE_ENV
+        value: production
       - key: NEXT_PUBLIC_API_URL
-        sync: false # Set in Render Dashboard to the public HTTPS backend URL (e.g. https://rag-intelligence-backend.onrender.com)
+        sync: false # Public HTTPS backend URL (e.g. https://rag-intelligence-backend.onrender.com)
       - key: BACKEND_INTERNAL_URL
         fromService:
           type: web
           name: rag-intelligence-backend
           property: host
+      - key: FRONTEND_URL
+        sync: false # Configured public URL of the frontend

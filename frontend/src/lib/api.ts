@@ -8,39 +8,50 @@ const API_BASE_URL =
     : process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
 
 class ApiClient {
-  private token: string | null = null;
   private tenantId: string = 'default-tenant';
 
   constructor() {
     if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('rag_token');
       this.tenantId = localStorage.getItem('rag_tenant_id') || 'default-tenant';
+      // Clean up any legacy token stored in localStorage
+      localStorage.removeItem('rag_token');
     }
   }
 
-  public setAuth(token: string, tenantId: string) {
-    this.token = token;
+  public setTenantId(tenantId: string) {
     this.tenantId = tenantId;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('rag_token', token);
       localStorage.setItem('rag_tenant_id', tenantId);
     }
   }
 
+  public setAuth(token: string, tenantId: string) {
+    // Retained for backward-compatibility with existing views,
+    // but strictly refuses to store the token in localStorage
+    this.setTenantId(tenantId);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('rag_token');
+    }
+  }
+
   public clearAuth() {
-    this.token = null;
     this.tenantId = 'default-tenant';
     if (typeof window !== 'undefined') {
       localStorage.removeItem('rag_token');
       localStorage.removeItem('rag_tenant_id');
     }
+    // Call server-side logout route to clear HttpOnly session cookie
+    if (typeof window !== 'undefined') {
+      fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+    }
   }
 
-  public getToken() {
-    return this.token;
+  public getToken(): string | null {
+    // Tokens are HttpOnly cookie-backed; client JS cannot and should not read the raw token
+    return null;
   }
 
-  public getTenantId() {
+  public getTenantId(): string {
     return this.tenantId;
   }
 
@@ -51,9 +62,7 @@ class ApiClient {
     if (isJson) {
       h['Content-Type'] = 'application/json';
     }
-    if (this.token) {
-      h['Authorization'] = `Bearer ${this.token}`;
-    }
+    // Bearer token is NOT sent from browser JS; it is securely attached by the BFF proxy from HttpOnly cookie
     return h;
   }
 
@@ -68,8 +77,15 @@ class ApiClient {
       throw new Error(err.detail || 'Login failed');
     }
     const data = await res.json();
-    this.setAuth(data.access_token, data.tenant_id);
+    if (data.tenant_id) {
+      this.setTenantId(data.tenant_id);
+    }
     return data;
+  }
+
+  public async logout() {
+    this.clearAuth();
+    await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   }
 
   public async getHealth(): Promise<SystemHealth> {
@@ -126,7 +142,9 @@ class ApiClient {
 
     const res = await fetch(`${API_BASE_URL}/api/documents/upload`, {
       method: 'POST',
-      headers: this.headers(false),
+      headers: {
+        'X-Tenant-ID': this.tenantId,
+      },
       body: formData,
     });
     if (!res.ok) {

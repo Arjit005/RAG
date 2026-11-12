@@ -22,8 +22,8 @@ if not _raw_jwt_secret:
             "FATAL: JWT_SECRET_KEY environment variable is mandatory in production environment. "
             "Please configure JWT_SECRET_KEY with at least 32 characters in Render Dashboard."
         )
-    # Safe development/test fallback with logged warning
-    JWT_SECRET_KEY = "rag-enterprise-jwt-dev-only-secret-key-32-chars-minimum"
+    # Safe development/test fallback (maintains compatibility with existing test fixtures)
+    JWT_SECRET_KEY = "rag-enterprise-jwt-insecure-default-change-in-prod-7f8e9d0c"
 else:
     if ENV in ("production", "prod") and len(_raw_jwt_secret) < 32:
         raise RuntimeError(

@@ -31,15 +31,30 @@ except Exception:
     except Exception:
         FaissVectorStore = None
 
+from src.rag.vector_store_factory import get_vector_store
+
 load_dotenv()
 
 class RAGSearch:
-    def __init__(self, persist_dir: str = "faiss_store", embedding_model: str = "all-MiniLM-L6-v2", llm_model: str = "qwen/qwen3.8-27b", gemini_api_key: str = None):
+    def __init__(
+        self,
+        persist_dir: str = "faiss_store",
+        embedding_model: str = "all-MiniLM-L6-v2",
+        llm_model: str = "qwen/qwen3.8-27b",
+        gemini_api_key: str = None,
+        vectorstore = None
+    ):
         self.persist_dir = persist_dir
         self.embedding_model = embedding_model
         self.llm_model = llm_model
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY")
-        self.vectorstore = FaissVectorStore(persist_dir, embedding_model)
+        
+        # Use centralized vector store factory if not explicitly provided
+        if vectorstore is not None:
+            self.vectorstore = vectorstore
+        else:
+            self.vectorstore = get_vector_store(embedding_model=embedding_model)
+
         self.ensure_store_loaded()
         self.init_llm()
 
@@ -75,12 +90,17 @@ class RAGSearch:
             print("[WARNING] GEMINI_API_KEY not provided. Multi-modal RAG will run in text-fallback mode.")
 
     def ensure_store_loaded(self):
-        faiss_path = os.path.join(self.persist_dir, "faiss.index")
-        meta_path = os.path.join(self.persist_dir, "metadata.pkl")
-        if not (os.path.exists(faiss_path) and os.path.exists(meta_path)):
-            self.rebuild_index()
-        else:
-            self.vectorstore.load()
+        # QdrantVectorStore handles its own collection lifecycle; only load or rebuild if using FAISS
+        if hasattr(self.vectorstore, "load"):
+            faiss_path = os.path.join(self.persist_dir, "faiss.index")
+            meta_path = os.path.join(self.persist_dir, "metadata.pkl")
+            if not (os.path.exists(faiss_path) and os.path.exists(meta_path)):
+                env = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
+                if env in ("production", "prod"):
+                    raise RuntimeError("FATAL: FAISS store missing in production environment. Production must use Qdrant Cloud.")
+                self.rebuild_index()
+            else:
+                self.vectorstore.load()
 
     def rebuild_index(self):
         try:
@@ -93,11 +113,15 @@ class RAGSearch:
     def search_and_answer(self, query: str, top_k: int = 5, chat_history: list = None, use_hybrid: bool = True, use_rerank: bool = True, tenant_id: Optional[str] = None) -> dict:
         if hasattr(self.vectorstore, "query"):
             import inspect
-            sig = inspect.signature(self.vectorstore.query)
-            if "tenant_id" in sig.parameters:
+            try:
+                sig = inspect.signature(self.vectorstore.query)
+                # If signature contains tenant_id or is a generic mock (*args, **kwargs)
+                if "tenant_id" in sig.parameters or "kwargs" in sig.parameters:
+                    results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
+                else:
+                    results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+            except (ValueError, TypeError):
                 results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
-            else:
-                results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
         else:
             results = []
         
@@ -275,11 +299,14 @@ Detailed Answer:"""
         """
         if hasattr(self.vectorstore, "query"):
             import inspect
-            sig = inspect.signature(self.vectorstore.query)
-            if "tenant_id" in sig.parameters:
+            try:
+                sig = inspect.signature(self.vectorstore.query)
+                if "tenant_id" in sig.parameters or "kwargs" in sig.parameters:
+                    results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
+                else:
+                    results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
+            except (ValueError, TypeError):
                 results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
-            else:
-                results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
         else:
             results = []
         

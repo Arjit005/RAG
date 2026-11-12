@@ -27,7 +27,8 @@ from src.rag.db.database import get_db, SessionLocal
 from src.rag.db.models import Document, DocumentChunk, IngestionJob, Tenant, User, UserRole, IngestionStatus
 from src.rag.db.repository import DocumentRepository
 from src.rag.db.lifecycle import DocumentLifecycleService
-from src.rag.db.auth import create_access_token, decode_access_token, verify_password
+from src.rag.db.auth import create_access_token, verify_password
+import src.rag.db.auth as auth_service
 from src.rag.qdrant_store import QdrantVectorStore
 from src.rag.llm.model_router import get_model_router, ProviderType, TierType, CircuitState
 
@@ -41,55 +42,55 @@ app = FastAPI(
 )
 
 # Setup CORS with explicit origin support
+env_mode = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
 frontend_origin = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
-allowed_origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:3001",
-]
-if frontend_origin:
-    allowed_origins.append(frontend_origin)
+
+if env_mode in ("production", "prod"):
+    # In production, ONLY the configured FRONTEND_URL is allowed.
+    # Localhost origins are strictly prohibited in production.
+    if frontend_origin:
+        allowed_origins = [frontend_origin]
+    else:
+        allowed_origins = []
+else:
+    allowed_origins = [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001",
+    ]
+    if frontend_origin:
+        allowed_origins.append(frontend_origin)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if os.getenv("ENV") == "production" else ["*"],
+    allow_origins=allowed_origins if env_mode in ("production", "prod") else ["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
-# Shared RAG Instance and Shared Qdrant Store
-rag_engine: Optional[RAGSearch] = None
-shared_qdrant_store: Optional[QdrantVectorStore] = None
+from src.rag.vector_store_factory import get_vector_store
 
-def get_shared_vector_store() -> Optional[QdrantVectorStore]:
-    global shared_qdrant_store
-    if shared_qdrant_store is None:
-        try:
-            q_url = os.getenv("QDRANT_URL")
-            q_key = os.getenv("QDRANT_API_KEY")
-            q_collection = os.getenv("QDRANT_COLLECTION", "rag_enterprise_chunks")
-            if q_url:
-                shared_qdrant_store = QdrantVectorStore(
-                    collection_name=q_collection,
-                    url=q_url,
-                    api_key=q_key
-                )
-            else:
-                shared_qdrant_store = QdrantVectorStore(
-                    collection_name=q_collection,
-                    location=os.getenv("QDRANT_LOCATION", "qdrant_storage")
-                )
-        except Exception as e:
-            logger.warning(f"Failed to initialize shared QdrantVectorStore: {e}")
-            return None
-    return shared_qdrant_store
+# Shared RAG Instance and Centralized Vector Store
+rag_engine: Optional[RAGSearch] = None
+
+def get_shared_vector_store():
+    """
+    Returns the centralized vector store instance from vector_store_factory.
+    Guarantees that retrieval, ingestion, deletion, and health probes all use the exact same store.
+    """
+    try:
+        return get_vector_store()
+    except Exception as e:
+        logger.warning(f"Failed to obtain centralized vector store: {e}")
+        return None
 
 def get_rag_engine() -> RAGSearch:
     global rag_engine
     if rag_engine is None:
-        rag_engine = RAGSearch()
+        v_store = get_shared_vector_store()
+        rag_engine = RAGSearch(vectorstore=v_store)
     return rag_engine
 
 # --- Security & Authentication Dependencies ---
@@ -121,7 +122,7 @@ def get_current_user(
     
     token = credentials.credentials
     try:
-        payload = decode_access_token(token)
+        payload = auth_service.decode_access_token(token)
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -455,7 +456,7 @@ def liveness_probe():
     Lightweight liveness probe for orchestrators (Render / Kubernetes).
     Returns immediately without querying database or loading ML weights.
     """
-    return {"status": "alive", "service": "rag-intelligence-backend"}
+    return {"status": "live", "service": "rag-intelligence-backend"}
 
 @app.get("/api/health", response_model=HealthResponse, tags=["General"])
 def health_check(db: Session = Depends(get_db)):
@@ -493,7 +494,8 @@ def health_check(db: Session = Depends(get_db)):
     models = router.registry
     active_models_count = len([m for m in models if m.enabled and router.health_map.get(m.provider) and router.health_map[m.provider].state != CircuitState.OPEN])
 
-    is_overall_healthy = db_healthy and (vector_store_healthy or os.getenv("ENV") != "production")
+    # Readiness check strictly fails if vector store OR database is not healthy
+    is_overall_healthy = db_healthy and vector_store_healthy
 
     if not is_overall_healthy:
         raise HTTPException(

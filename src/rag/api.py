@@ -529,7 +529,15 @@ def login_for_access_token(req: LoginRequest, db: Session = Depends(get_db)):
     """
     Authenticates a user by email and password, returning a signed JWT access token.
     """
-    user = db.query(User).filter(User.email == req.email).first()
+    try:
+        user = db.query(User).filter(User.email == req.email).first()
+    except Exception as db_err:
+        logger.exception("Database query failed during login")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database connection error: {str(db_err)}"
+        )
+
     if not user or not verify_password(req.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -537,12 +545,19 @@ def login_for_access_token(req: LoginRequest, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    token = create_access_token(
-        user_id=user.id,
-        email=user.email,
-        tenant_id=user.tenant_id,
-        role=user.role
-    )
+    try:
+        token = create_access_token(
+            user_id=user.id,
+            email=user.email,
+            tenant_id=user.tenant_id,
+            role=user.role
+        )
+    except Exception as token_err:
+        logger.exception("Token generation failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"JWT creation failed: {str(token_err)}"
+        )
 
     return {
         "access_token": token,

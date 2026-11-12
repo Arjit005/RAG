@@ -1,5 +1,12 @@
 import os
 import sys
+
+# Memory optimizations for constrained environments (e.g., Render Free 512MB RAM)
+os.environ["TORCH_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MALLOC_ARENA_MAX"] = "2"
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 import json
 import uuid
 import datetime
@@ -17,11 +24,6 @@ import jwt
 # Setup sys.path for internal imports
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-try:
-    from rag.search import RAGSearch
-except ImportError:
-    from search import RAGSearch
 
 from src.rag.db.database import get_db, SessionLocal
 from src.rag.db.models import Document, DocumentChunk, IngestionJob, Tenant, User, UserRole, IngestionStatus
@@ -73,7 +75,7 @@ app.add_middleware(
 from src.rag.vector_store_factory import get_vector_store
 
 # Shared RAG Instance and Centralized Vector Store
-rag_engine: Optional[RAGSearch] = None
+rag_engine: Optional[Any] = None
 
 def get_shared_vector_store():
     """
@@ -86,9 +88,13 @@ def get_shared_vector_store():
         logger.warning(f"Failed to obtain centralized vector store: {e}")
         return None
 
-def get_rag_engine() -> RAGSearch:
+def get_rag_engine():
     global rag_engine
     if rag_engine is None:
+        try:
+            from rag.search import RAGSearch
+        except ImportError:
+            from search import RAGSearch
         v_store = get_shared_vector_store()
         rag_engine = RAGSearch(vectorstore=v_store)
     return rag_engine

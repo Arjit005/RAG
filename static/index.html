@@ -146,27 +146,42 @@
                     </div>
                 </div>
 
-                <!-- Document Inventory Sidebar -->
-                <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col h-[600px]">
-                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-[#F1F5F9]">
-                        <h3 class="font-bold text-[#0F172A]">Knowledge Base</h3>
-                        <span id="docCountBadge" class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded">0 Docs</span>
-                    </div>
+                <!-- Right Column: Upload Document & Knowledge Base -->
+                <div class="space-y-6 flex flex-col">
 
-                    <!-- Document List Container -->
-                    <div id="docsList" class="flex-1 overflow-y-auto space-y-2 text-xs">
-                        <div class="text-[#94A3B8] text-center py-8">Loading document inventory...</div>
-                    </div>
-
-                    <!-- Direct Upload Form -->
-                    <div class="mt-4 pt-4 border-t border-[#F1F5F9]">
-                        <label class="block text-xs font-semibold text-[#334155] mb-2">Upload Document (.pdf, .txt)</label>
-                        <input type="file" id="fileUploadInput" accept=".pdf,.txt,.docx,.md" class="block w-full text-xs text-[#64748B] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EEF2FF] file:text-[#4F46E5] hover:file:bg-[#E0E7FF] cursor-pointer">
-                        <button onclick="handleFileUpload()" id="uploadBtn" class="w-full mt-2 py-2 px-3 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-lg text-xs font-medium transition-colors">
-                            Ingest & Index
+                    <!-- Direct Upload Card -->
+                    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-[#F1F5F9]">
+                            <h3 class="font-bold text-[#0F172A] flex items-center gap-2">
+                                <svg class="w-4 h-4 text-[#2563EB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                Upload & Index Document
+                            </h3>
+                            <span class="text-[10px] font-semibold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded">RAG Ingestion</span>
+                        </div>
+                        <p class="text-xs text-[#64748B] mb-3">Upload research papers, PDFs, or text files to index into vector database.</p>
+                        <input type="file" id="fileUploadInput" accept=".pdf,.txt,.docx,.md" class="block w-full text-xs text-[#64748B] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EEF2FF] file:text-[#4F46E5] hover:file:bg-[#E0E7FF] cursor-pointer border border-[#E2E8F0] rounded-lg p-1.5 bg-[#F8FAFC]">
+                        <button onclick="handleFileUpload()" id="uploadBtn" class="w-full mt-3 py-2.5 px-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2">
+                            <span>Ingest & Index Vector Chunks</span>
                         </button>
-                        <div id="uploadStatus" class="text-xs mt-1.5 text-center hidden"></div>
+                        <div id="uploadStatus" class="text-xs mt-2 text-center hidden"></div>
                     </div>
+
+                    <!-- Knowledge Base Inventory -->
+                    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col h-[380px]">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-[#F1F5F9]">
+                            <h3 class="font-bold text-[#0F172A] flex items-center gap-2">
+                                <svg class="w-4 h-4 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                Knowledge Base
+                            </h3>
+                            <span id="docCountBadge" class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded">0 Docs</span>
+                        </div>
+
+                        <!-- Document List Container -->
+                        <div id="docsList" class="flex-1 overflow-y-auto space-y-2 text-xs pr-1">
+                            <div class="text-[#94A3B8] text-center py-8">Loading document inventory...</div>
+                        </div>
+                    </div>
+
                 </div>
 
             </div>
@@ -369,11 +384,12 @@
                     `;
                 }
 
+                const replyText = data.answer || data.response || "No response received.";
                 messages.innerHTML += `
                     <div class="flex gap-3">
                         <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
                         <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#1E293B] max-w-[85%] leading-relaxed">
-                            <div class="whitespace-pre-wrap">${data.response}</div>
+                            <div class="whitespace-pre-wrap">${replyText}</div>
                             ${citationsHtml}
                         </div>
                     </div>

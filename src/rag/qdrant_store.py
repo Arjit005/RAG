@@ -42,7 +42,13 @@ class QdrantVectorStore(BaseVectorStore):
 
         # Connection strategy: URL/Host/Port or embedded local directory/in-memory
         env = os.getenv("ENV", os.getenv("ENVIRONMENT", "development")).lower()
-        qdrant_url = url or os.getenv("QDRANT_URL")
+        DEMO_CLUSTER_URL = "https://6f3fe541-7e22-40bc-9792-b8a55f98ffb7.eu-central-1-0.aws.cloud.qdrant.io:6333"
+        raw_url = url or os.getenv("QDRANT_URL") or os.getenv("QDRANT_ENDPOINT")
+        if not raw_url or "cloud.qdrant.io/accounts" in raw_url:
+            qdrant_url = DEMO_CLUSTER_URL
+        else:
+            qdrant_url = raw_url
+
         qdrant_api_key = api_key or os.getenv("QDRANT_API_KEY")
 
         if qdrant_url:

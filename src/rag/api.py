@@ -482,34 +482,35 @@ def liveness_probe():
     """
     return {"status": "live", "service": "rag-intelligence-backend"}
 
-@app.get("/api/debug/db-check", tags=["General"])
-def debug_db_check(current_user: AuthenticatedUser = Depends(get_current_user)):
-    """Diagnostic endpoint to inspect live database connectivity. Requires authentication."""
-    db_url = os.getenv("DATABASE_URL", "NOT_SET")
-    from src.rag.db.database import mask_connection_url, SessionLocal
-    masked_url = mask_connection_url(db_url)
+@app.get("/api/debug/qdrant-check", tags=["General"])
+def debug_qdrant_check(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """Diagnostic endpoint to inspect Qdrant connection error details."""
+    raw_url = os.getenv("QDRANT_URL") or os.getenv("QDRANT_ENDPOINT") or "NOT_SET"
+    masked_url = raw_url[:30] + "..." if len(raw_url) > 30 else raw_url
+    q_key = os.getenv("QDRANT_API_KEY")
+    masked_key = f"{q_key[:4]}...{q_key[-4:]}" if q_key and len(q_key) > 8 else ("SET" if q_key else "NOT_SET")
 
+    err_detail = None
+    collection_status = None
     try:
-        db = SessionLocal()
-        u = db.query(User).filter(User.email == "admin@enterprise.internal").first()
-        user_info = {
-            "found": bool(u),
-            "email": u.email if u else None,
-            "has_pwd": bool(u.hashed_password) if u else False
-        }
-        db.close()
-        return {
-            "status": "ok",
-            "masked_url": masked_url,
-            "user": user_info
-        }
+        q_store = get_shared_vector_store()
+        if not q_store:
+            err_detail = "get_shared_vector_store returned None"
+        elif not hasattr(q_store, "client"):
+            err_detail = f"q_store has no client attribute: {type(q_store)}"
+        else:
+            q_coll = os.getenv("QDRANT_COLLECTION", "rag_enterprise_chunks")
+            c = q_store.client.get_collection(q_coll)
+            collection_status = str(c.status)
     except Exception as e:
-        return {
-            "status": "error",
-            "masked_url": masked_url,
-            "error": str(e),
-            "type": type(e).__name__
-        }
+        err_detail = f"{type(e).__name__}: {str(e)}"
+
+    return {
+        "configured_url_prefix": masked_url,
+        "api_key_status": masked_key,
+        "error": err_detail,
+        "collection_status": collection_status
+    }
 
 @app.get("/api/health", response_model=HealthResponse, tags=["General"])
 def health_check(db: Session = Depends(get_db)):

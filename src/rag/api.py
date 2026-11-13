@@ -367,6 +367,7 @@ def process_document_ingestion_job(
     Updates the persistent IngestionJob status and progress atomically.
     """
     db = SessionLocal()
+    job = None
     try:
         job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
@@ -384,6 +385,8 @@ def process_document_ingestion_job(
             from langchain_text_splitters import RecursiveCharacterTextSplitter
             splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             split_texts = splitter.split_text(text)
+            if not split_texts and text.strip():
+                split_texts = [text.strip()]
             for idx, chunk_str in enumerate(split_texts):
                 raw_chunks.append({
                     "text": chunk_str,
@@ -404,7 +407,10 @@ def process_document_ingestion_job(
                 for page_num in range(page_count):
                     p_text = doc_pdf[page_num].get_text()
                     if p_text.strip():
-                        for c_idx, sub_chunk in enumerate(splitter.split_text(p_text)):
+                        chunks_for_page = splitter.split_text(p_text)
+                        if not chunks_for_page:
+                            chunks_for_page = [p_text.strip()]
+                        for c_idx, sub_chunk in enumerate(chunks_for_page):
                             raw_chunks.append({
                                 "text": sub_chunk,
                                 "page": page_num + 1,
@@ -422,11 +428,16 @@ def process_document_ingestion_job(
             # Fallback for csv, json, md, etc.
             text = content_bytes.decode("utf-8", errors="ignore")
             raw_chunks.append({
-                "text": text[:2000],
+                "text": text[:2000] if text.strip() else f"File: {filename}",
                 "page": 1,
                 "type": "text",
                 "summary": None
             })
+
+        logger.info(f"Chunking completed for {filename}: generated {len(raw_chunks)} chunks.")
+
+        if not raw_chunks:
+            raise ValueError(f"No extractable text found in '{filename}'.")
 
         if job:
             job.progress_percent = 50
@@ -453,10 +464,17 @@ def process_document_ingestion_job(
             db.commit()
 
     except Exception as e:
-        if job:
-            job.status = IngestionStatus.FAILED.value
-            job.error_message = str(e)[:500]
-            db.commit()
+        logger.exception(f"Document ingestion job {job_id} failed: {e}")
+        try:
+            if not job:
+                job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+            if job:
+                job.status = IngestionStatus.FAILED.value
+                job.error_message = str(e)[:500]
+                job.updated_at = datetime.datetime.utcnow()
+                db.commit()
+        except Exception as commit_err:
+            logger.error(f"Failed to record failure status for job {job_id}: {commit_err}")
     finally:
         db.close()
 

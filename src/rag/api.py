@@ -581,6 +581,39 @@ def debug_llm_test(current_user: AuthenticatedUser = Depends(get_current_user)):
 
     return results
 
+@app.get("/api/debug/test-flow", tags=["General"])
+def debug_test_flow(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """Profiles the exact steps of RAGSearch and vector query to find the bottleneck."""
+    import time
+    timings = {}
+
+    t0 = time.time()
+    try:
+        from src.rag.vector_store_factory import get_vector_store
+        v_store = get_shared_vector_store()
+        timings["1_get_vector_store"] = round(time.time() - t0, 3)
+    except Exception as e:
+        timings["1_get_vector_store_err"] = str(e)
+
+    t0 = time.time()
+    try:
+        from src.rag.search import RAGSearch
+        engine = RAGSearch(vectorstore=v_store)
+        timings["2_init_rag_search"] = round(time.time() - t0, 3)
+    except Exception as e:
+        timings["2_init_rag_search_err"] = str(e)
+
+    t0 = time.time()
+    try:
+        query_text = "test"
+        res = v_store.query(query_text, top_k=2, use_hybrid=False, use_rerank=False, tenant_id=current_user.tenant_id)
+        timings["3_vector_query"] = round(time.time() - t0, 3)
+        timings["3_results_count"] = len(res)
+    except Exception as e:
+        timings["3_vector_query_err"] = str(e)
+
+    return timings
+
 @app.get("/api/health", response_model=HealthResponse, tags=["General"])
 def health_check(db: Session = Depends(get_db)):
     """

@@ -977,13 +977,14 @@ def list_pipeline_jobs(
 # --- Authenticated Research Chat Endpoints (Phase F5) ---
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Research Chat"])
-def chat_authenticated(
+async def chat_authenticated(
     req: ChatRequest,
     tenant_id: str = Depends(get_authorized_tenant)
 ):
     """
     Authenticated research chat endpoint enforcing strict tenant isolation.
     Executes hybrid retrieval, optional cross-encoder reranking, and evidence-grounded synthesis.
+    Offloaded to threadpool with asyncio.to_thread to prevent blocking the async event loop.
     """
     if not req.query or not req.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty or whitespace.")
@@ -994,7 +995,9 @@ def chat_authenticated(
         engine.init_llm()
 
     try:
-        res = engine.search_and_answer(
+        import asyncio
+        res = await asyncio.to_thread(
+            engine.search_and_answer,
             query=req.query,
             top_k=req.top_k,
             chat_history=req.chat_history,

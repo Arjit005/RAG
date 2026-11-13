@@ -15,19 +15,19 @@ import os
 import base64
 from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
-from langchain_groq import ChatGroq
+# from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain_google_genai import ChatGoogleGenerativeAI
 from src.rag.llm.model_router import get_model_router
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 try:
-    from rag.vectorstore import FaissVectorStore
+    # from rag.vectorstore import FaissVectorStore
 except Exception:
     try:
-        from vectorstore import FaissVectorStore
+        # from vectorstore import FaissVectorStore
     except Exception:
         FaissVectorStore = None
 
@@ -59,35 +59,9 @@ class RAGSearch:
         self.init_llm()
 
     def init_llm(self):
-        # Initialize Groq LLM
-        groq_api_key = os.getenv("GROQ_API_KEY")
-        if groq_api_key:
-            try:
-                self.llm = ChatGroq(groq_api_key=groq_api_key, model_name=self.llm_model)
-                print(f"[INFO] Groq LLM initialized with model: {self.llm_model}")
-            except Exception as e:
-                self.llm = None
-                print(f"[WARNING] Groq LLM failed to initialize: {e}")
-        else:
-            self.llm = None
-            print("[WARNING] GROQ_API_KEY not found in environment variables.")
-
-        # Initialize Gemini Multi-modal LLM
-        if self.gemini_api_key:
-            try:
-                # Use gemini-2.0-flash for advanced multi-modal synthesis
-                self.gemini_llm = ChatGoogleGenerativeAI(
-                    model="gemini-2.0-flash",
-                    google_api_key=self.gemini_api_key,
-                    temperature=0.0
-                )
-                print("[INFO] Gemini 2.0 Flash LLM initialized.")
-            except Exception as e:
-                self.gemini_llm = None
-                print(f"[WARNING] Gemini LLM failed to initialize: {e}")
-        else:
-            self.gemini_llm = None
-            print("[WARNING] GEMINI_API_KEY not provided. Multi-modal RAG will run in text-fallback mode.")
+        # Multi-provider routing is handled dynamically by ModelRouter
+        self.llm = None
+        self.gemini_llm = None
 
     def ensure_store_loaded(self):
         # QdrantVectorStore handles its own collection lifecycle; only load or rebuild if using FAISS

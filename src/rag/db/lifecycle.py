@@ -67,12 +67,14 @@ class DocumentLifecycleService:
         # Step 3 & 4: Embed chunk texts and Synchronize to Vector Store
         try:
             embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
-            batch_size = 16
+            batch_size = 8
             embeddings = []
+            import gc
             for i in range(0, len(embed_texts), batch_size):
                 batch = embed_texts[i:i+batch_size]
                 batch_embeddings = self.embedding_pipeline.model.encode(batch, show_progress_bar=False).tolist()
                 embeddings.extend(batch_embeddings)
+                gc.collect()
 
             chunks_payload = [
                 {

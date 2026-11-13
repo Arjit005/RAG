@@ -342,6 +342,16 @@ class QdrantVectorStore(BaseVectorStore):
         use_rerank: bool = True,
         tenant_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
+        # Fast exit if collection is empty to prevent loading heavy ML weights or hanging on Render
+        try:
+            coll_info = self.client.get_collection(self.collection_name)
+            points_count = getattr(coll_info, "points_count", 0) or getattr(coll_info, "indexed_vectors_count", 0) or 0
+            if points_count == 0:
+                logger.info(f"Qdrant collection '{self.collection_name}' has 0 points. Skipping embedding model load.")
+                return []
+        except Exception as coll_err:
+            logger.debug(f"Could not verify collection points count: {coll_err}")
+
         candidate_count = top_k * 3 if use_rerank else top_k
         query_emb = self.embedding_pipeline.model.encode([query_text]).tolist()
 

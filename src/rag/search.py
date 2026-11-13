@@ -164,11 +164,33 @@ class RAGSearch:
 
         context_str = "\n\n---\n\n".join(context_blocks)
         
+        # Multi-Provider Router with Automatic Failover
+        router = get_model_router()
+
         if not context_str:
-            return {
-                "answer": "No relevant document chunks were found in the knowledge base.",
-                "citations": []
-            }
+            # If no documents are in the index yet, answer gracefully with foundational knowledge and helpful guidance
+            empty_prompt = f"""You are a helpful and precise RAG assistant.
+Note: The user's document knowledge base does not currently contain relevant indexed documents for this query.
+Please provide a helpful, direct, and informative answer to the user's question, and gently let them know they can upload documents in the Knowledge Base tab to ground future answers in their proprietary data.
+
+User Question: {query}
+
+Answer:"""
+            try:
+                route_res = router.invoke(prompt=empty_prompt, preferred_model_id=self.llm_model)
+                return {
+                    "answer": route_res.get("answer", "No document context found. Please upload documents in the Knowledge Base."),
+                    "citations": [],
+                    "model_id": route_res.get("model_id", self.llm_model),
+                    "provider": route_res.get("provider", "router"),
+                    "tier": route_res.get("tier", "standard"),
+                    "failover_occurred": route_res.get("failover_occurred", False)
+                }
+            except Exception as e:
+                return {
+                    "answer": "No relevant document chunks were found in the knowledge base. Please upload documents in the Knowledge Base tab to begin querying.",
+                    "citations": []
+                }
 
         history_str = ""
         if chat_history:

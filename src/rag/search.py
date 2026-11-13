@@ -119,6 +119,8 @@ class RAGSearch:
                 if "tenant_id" in sig.parameters or "kwargs" in sig.parameters:
                     results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
                 else:
+                    if tenant_id is not None:
+                        raise TypeError("Underlying vector store does not support tenant-scoped queries; rejecting unscoped multi-tenant search.")
                     results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
             except (ValueError, TypeError):
                 results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
@@ -304,6 +306,8 @@ Detailed Answer:"""
                 if "tenant_id" in sig.parameters or "kwargs" in sig.parameters:
                     results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
                 else:
+                    if tenant_id is not None:
+                        raise TypeError("Underlying vector store does not support tenant-scoped queries; rejecting unscoped multi-tenant search.")
                     results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank)
             except (ValueError, TypeError):
                 results = self.vectorstore.query(query, top_k=top_k, use_hybrid=use_hybrid, use_rerank=use_rerank, tenant_id=tenant_id)
@@ -427,8 +431,8 @@ Detailed Answer:"""
                     yield {"type": "done"}
                     return
                 elif ev_type == "error":
-                    yield {"type": "error", "error": ev.get("error")}
-                    return
+                    print(f"[WARNING] Router yielded streaming error: {ev.get('error')}. Attempting fallbacks.")
+                    break
         except Exception as router_err:
             print(f"[WARNING] Model router streaming failed: {router_err}. Falling back to direct LLM.")
 

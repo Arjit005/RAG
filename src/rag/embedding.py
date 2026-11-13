@@ -15,6 +15,10 @@ except ImportError:
 
 class EmbeddingPipeline:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, chunk_overlap: int = 200):
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        if chunk_overlap < 0 or chunk_overlap >= chunk_size:
+            raise ValueError("chunk_overlap must be non-negative and strictly less than chunk_size")
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.model_name = model_name

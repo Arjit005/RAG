@@ -109,7 +109,11 @@ class FaissVectorStore:
                 })
                 
         if not all_items:
-            print("[WARNING] No items to index.")
+            self.index = None
+            self.metadata = []
+            self.tokenized_corpus = []
+            self.bm25 = None
+            print("[WARNING] No items to index. Reset store to empty.")
             return
             
         embed_texts = [item["embed_text"] for item in all_items]
@@ -170,10 +174,14 @@ class FaissVectorStore:
         print(f"[INFO] Loaded Faiss index, BM25, and metadata from {self.persist_dir}")
 
     def search(self, query_embedding: np.ndarray, top_k: int = 5):
+        if self.index is None or len(self.metadata) == 0:
+            return []
         D, I = self.index.search(query_embedding, top_k)
         results = []
         for idx, dist in zip(I[0], D[0]):
-            meta = self.metadata[idx] if idx < len(self.metadata) else None
+            if idx < 0 or idx >= len(self.metadata):
+                continue
+            meta = self.metadata[idx]
             results.append({"index": idx, "distance": dist, "metadata": meta})
         return results
 

@@ -44,13 +44,20 @@ def safe_qdrant_transfer(
             print(f"[ERROR] Collection '{collection_name}' not found in source storage.")
             return False
 
-        # Read all source points with payload and vectors
-        source_records, _ = source_client.scroll(
-            collection_name=collection_name,
-            limit=2000,
-            with_payload=True,
-            with_vectors=True
-        )
+        # Read all source points with payload and vectors using complete pagination
+        source_records = []
+        next_offset = None
+        while True:
+            records, next_offset = source_client.scroll(
+                collection_name=collection_name,
+                limit=1000,
+                offset=next_offset,
+                with_payload=True,
+                with_vectors=True
+            )
+            source_records.extend(records)
+            if next_offset is None or not records:
+                break
         print(f"[SOURCE] Successfully loaded {len(source_records)} points from source.")
 
         # Tally source tenants

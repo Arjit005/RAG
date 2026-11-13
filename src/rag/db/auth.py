@@ -33,7 +33,12 @@ else:
 
 JWT_ALGORITHM = "HS256"
 _raw_expire = os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES") or os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or "1440"
-JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(_raw_expire)  # Default 24 hours
+try:
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES = int(_raw_expire)
+    if JWT_ACCESS_TOKEN_EXPIRE_MINUTES <= 0:
+        raise ValueError("Must be positive")
+except Exception:
+    raise ValueError(f"Invalid JWT_ACCESS_TOKEN_EXPIRE_MINUTES: '{_raw_expire}'. Must be a positive integer.")
 
 
 def hash_password(password: str) -> str:

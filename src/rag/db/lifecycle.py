@@ -58,11 +58,15 @@ class DocumentLifecycleService:
 
         # Step 2: Save chunk records
         chunks = self.repo.save_chunks(doc.id, tenant_id, raw_chunks)
+        if not chunks:
+            logger.warning(f"Ingestion produced no chunks for doc {doc.id}")
+            doc.status = IngestionStatus.FAILED.value
+            self.db.commit()
+            raise ValueError(f"Document '{filename}' could not be chunked or contained no readable text.")
 
-        # Step 3: Embed chunk texts
-        embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
-        if embed_texts:
-            # FIX WEAK-3: Batch embedding to avoid OOM on large documents
+        # Step 3 & 4: Embed chunk texts and Synchronize to Vector Store
+        try:
+            embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
             batch_size = 16
             embeddings = []
             for i in range(0, len(embed_texts), batch_size):
@@ -70,42 +74,38 @@ class DocumentLifecycleService:
                 batch_embeddings = self.embedding_pipeline.model.encode(batch, show_progress_bar=False).tolist()
                 embeddings.extend(batch_embeddings)
 
-            # Step 4: Synchronize to Vector Store
-            try:
-                chunks_payload = [
-                    {
-                        "id": c.id,
-                        "chunk_index": c.chunk_index,
-                        "page": c.page_number,
-                        "type": c.chunk_type,
-                        "text": c.content_text,
-                        "summary": c.summary_text,
-                        "filename": filename,
-                        "source": filename,
-                        "image_path": c.image_path
-                    }
-                    for c in chunks
-                ]
-                self.vector_store.add_documents(
-                    tenant_id=tenant_id,
-                    document_id=doc.id,
-                    chunks=chunks_payload,
-                    embeddings=embeddings
-                )
-                # Step 5: Mark synced
-                self.repo.update_chunks_sync_status([c.id for c in chunks], SyncStatus.SYNCED)
-                doc.status = IngestionStatus.COMPLETED.value
-            except Exception as e:
-                logger.error(f"Vector store synchronization failed for doc {doc.id}: {e}")
-                self.repo.update_chunks_sync_status([c.id for c in chunks], SyncStatus.FAILED)
-                doc.status = IngestionStatus.FAILED.value
-                self.db.commit()
-                raise e
-
-        doc.status = IngestionStatus.COMPLETED.value
-        self.db.commit()
-        self.db.refresh(doc)
-        return doc
+            chunks_payload = [
+                {
+                    "id": c.id,
+                    "chunk_index": c.chunk_index,
+                    "page": c.page_number,
+                    "type": c.chunk_type,
+                    "text": c.content_text,
+                    "summary": c.summary_text,
+                    "filename": filename,
+                    "source": filename,
+                    "image_path": c.image_path
+                }
+                for c in chunks
+            ]
+            self.vector_store.add_documents(
+                tenant_id=tenant_id,
+                document_id=doc.id,
+                chunks=chunks_payload,
+                embeddings=embeddings
+            )
+            # Step 5: Mark synced
+            self.repo.update_chunks_sync_status([c.id for c in chunks], SyncStatus.SYNCED)
+            doc.status = IngestionStatus.COMPLETED.value
+            self.db.commit()
+            self.db.refresh(doc)
+            return doc
+        except Exception as e:
+            logger.error(f"Embedding or vector synchronization failed for doc {doc.id}: {e}")
+            self.repo.update_chunks_sync_status([c.id for c in chunks], SyncStatus.FAILED)
+            doc.status = IngestionStatus.FAILED.value
+            self.db.commit()
+            raise e
 
     def delete_document(self, document_id: str, tenant_id: str) -> bool:
         """

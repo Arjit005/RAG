@@ -122,12 +122,17 @@ class QdrantVectorStore(BaseVectorStore):
         chunks: List[Dict[str, Any]],
         embeddings: List[List[float]]
     ) -> List[str]:
+        if len(chunks) != len(embeddings):
+            raise ValueError(
+                f"Mismatch in chunks ({len(chunks)}) and embeddings ({len(embeddings)}) length."
+            )
+
         points = []
         point_ids = []
 
         for idx, (chunk, emb) in enumerate(zip(chunks, embeddings)):
             raw_id = chunk.get("id") or f"{document_id}_{idx}"
-            chunk_uuid = _ensure_valid_uuid(raw_id)
+            chunk_uuid = _ensure_valid_uuid(f"{tenant_id}:{document_id}:{raw_id}")
             point_ids.append(chunk_uuid)
 
             payload = {
@@ -202,16 +207,22 @@ class QdrantVectorStore(BaseVectorStore):
             filters=filters
         )
 
-        # Build sparse scoring over candidate space
+        # Build sparse scoring over candidate space with complete pagination
         q_filter = self._build_filter(tenant_id, filters)
-        scroll_res, _ = self.client.scroll(
-            collection_name=self.collection_name,
-            scroll_filter=q_filter,
-            limit=1000,
-            with_payload=True
-        )
+        all_points = []
+        next_offset = None
 
-        all_points = scroll_res
+        while True:
+            scroll_res, next_offset = self.client.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=q_filter,
+                limit=1000,
+                offset=next_offset,
+                with_payload=True
+            )
+            all_points.extend(scroll_res)
+            if next_offset is None or not scroll_res:
+                break
         if not all_points:
             return []
 

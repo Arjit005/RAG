@@ -62,17 +62,26 @@ def main():
     sqlite_chunk_ids = set(r[0] for r in cur.fetchall())
     conn.close()
 
-    # 4. Qdrant consistency check
+    # 4. Qdrant consistency check with full pagination
     qdrant_path = os.getenv("QDRANT_PATH", "qdrant_storage")
     print(f"[QDRANT] Connecting to local Qdrant at '{qdrant_path}'...")
     client = QdrantClient(path=qdrant_path)
-    points, _ = client.scroll(
-        collection_name="rag_enterprise_chunks",
-        limit=1000,
-        with_payload=False,
-        with_vectors=False
-    )
-    qdrant_ids = set(p.id for p in points)
+    all_points = []
+    next_offset = None
+
+    while True:
+        points, next_offset = client.scroll(
+            collection_name="rag_enterprise_chunks",
+            limit=1000,
+            offset=next_offset,
+            with_payload=False,
+            with_vectors=False
+        )
+        all_points.extend(points)
+        if next_offset is None or not points:
+            break
+
+    qdrant_ids = set(p.id for p in all_points)
     client.close()
     print(f"[QDRANT] Total points retrieved: {len(qdrant_ids)}")
     

@@ -204,6 +204,18 @@
         let token = localStorage.getItem('rag_token') || null;
         let tenantId = localStorage.getItem('rag_tenant_id') || 'default-tenant';
 
+        function escapeHtml(text) {
+            if (!text) return '';
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return String(text).replace(/[&<>"']/g, m => map[m]);
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             if (token) {
                 showWorkspace();
@@ -326,12 +338,14 @@
                         : d.status === 'failed'
                         ? 'text-[#DC2626] border-[#FECACA] bg-[#FEF2F2]'
                         : 'text-[#D97706] border-[#FDE68A] bg-[#FFFBEB]';
+                    const safeFilename = escapeHtml(d.filename);
+                    const safeStatus = escapeHtml(d.status);
                     return `
                     <div class="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl hover:border-[#CBD5E1] transition-colors">
-                        <div class="font-semibold text-[#0F172A] truncate" title="${d.filename}">📄 ${d.filename}</div>
+                        <div class="font-semibold text-[#0F172A] truncate" title="${safeFilename}">📄 ${safeFilename}</div>
                         <div class="flex items-center justify-between text-[#64748B] text-[11px] mt-1">
                             <span>Chunks: ${d.chunk_count ?? d.page_count ?? 1}</span>
-                            <span class="px-1.5 py-0.5 rounded bg-white border ${statusColor} font-medium">${d.status}</span>
+                            <span class="px-1.5 py-0.5 rounded bg-white border ${statusColor} font-medium">${safeStatus}</span>
                         </div>
                     </div>
                 `;
@@ -353,10 +367,11 @@
             sendBtn.disabled = true;
 
             // User Message
+            const safeQuery = escapeHtml(q);
             messages.innerHTML += `
                 <div class="flex gap-3 justify-end">
                     <div class="bg-[#2563EB] text-white rounded-2xl p-4 max-w-[85%] leading-relaxed shadow-xs">
-                        ${q}
+                        ${safeQuery}
                     </div>
                 </div>
             `;
@@ -397,22 +412,29 @@
                         <div class="mt-3 pt-3 border-t border-[#E2E8F0]/60">
                             <div class="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Verified Evidence & Citations</div>
                             <div class="flex flex-wrap gap-1.5">
-                                ${data.citations.map(c => `
-                                    <span class="px-2 py-0.5 bg-white border border-[#CBD5E1] rounded text-[11px] font-mono text-[#334155]" title="${c.source || 'Unknown'} p.${c.page}">
-                                        ${c.source || 'Unknown'} p.${c.page} · Score: ${(c.distance || 0).toFixed(3)}
+                                ${data.citations.map(c => {
+                                    const safeSource = escapeHtml(c.source || 'Unknown');
+                                    const safeSnippet = escapeHtml(c.snippet || '');
+                                    const pageNum = parseInt(c.page) || 1;
+                                    const scoreVal = (parseFloat(c.distance) || 0).toFixed(3);
+                                    return `
+                                    <span class="px-2 py-0.5 bg-white border border-[#CBD5E1] rounded text-[11px] font-mono text-[#334155]" title="${safeSnippet}">
+                                        ${safeSource} p.${pageNum} · Score: ${scoreVal}
                                     </span>
-                                `).join('')}
+                                `;
+                                }).join('')}
                             </div>
                         </div>
                     `;
                 }
 
-                const replyText = data.answer || data.response || "No response received.";
+                const rawReplyText = data.answer || data.response || "No response received.";
+                const safeReplyText = escapeHtml(rawReplyText);
                 messages.innerHTML += `
                     <div class="flex gap-3">
                         <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
                         <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#1E293B] max-w-[85%] leading-relaxed">
-                            <div class="whitespace-pre-wrap">${replyText}</div>
+                            <div class="whitespace-pre-wrap">${safeReplyText}</div>
                             ${citationsHtml}
                         </div>
                     </div>

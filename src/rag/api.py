@@ -563,7 +563,7 @@ def health_check(db: Session = Depends(get_db)):
 
     return {
         "status": "healthy",
-        "indexed_documents_count": db.query(Document).filter(Document.tenant_id == "default-tenant").count() if db_healthy else 0,
+        "indexed_documents_count": db.query(Document).count() if db_healthy else 0,
         "vector_store_ready": vector_store_healthy,
         "groq_llm_ready": active_models_count > 0,
         "embedding_model": os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
@@ -1062,11 +1062,18 @@ def get_llm_models(tenant_id: str = Depends(get_authorized_tenant)):
 @app.post("/api/llm/config", tags=["LLM Model Router"])
 def update_llm_model_config(
     req: ModelConfigUpdateRequest,
-    tenant_id: str = Depends(get_authorized_tenant)
+    current_user: AuthenticatedUser = Depends(get_current_user)
 ):
     """
-    Allows authorized administrators to enable/disable specific models or update priorities.
+    Allows system administrators to enable/disable specific models or update priorities.
+    Restricted to system administrators to prevent cross-tenant disruption.
     """
+    if current_user.role not in (UserRole.SYSTEM_ADMIN.value, UserRole.ADMIN.value):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden: Only system administrators can update global LLM model configuration."
+        )
+
     router = get_model_router()
     target_model = None
     for m in router.registry:

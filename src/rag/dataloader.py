@@ -1,15 +1,3 @@
-import sys
-import uuid
-# Mock uuid_utils to bypass Windows AppLocker/WDAC DLL block
-class CompatMock:
-    @staticmethod
-    def uuid7():
-        return uuid.uuid4()
-class UUIDUtilsMock:
-    compat = CompatMock()
-sys.modules['uuid_utils'] = UUIDUtilsMock()
-sys.modules['uuid_utils.compat'] = CompatMock()
-
 import os
 import base64
 import uuid
@@ -93,80 +81,82 @@ def parse_pdf_multimodal(pdf_path: Path, extract_images_dir: Path, api_key: str 
         print(f"[ERROR] Failed to open PDF {pdf_path}: {e}")
         return documents
 
-    for page_num in range(len(doc)):
-        page = doc[page_num]
-        page_index = page_num + 1
-        
-        # 1. Extract Text Chunks
-        text = page.get_text()
-        if text.strip():
-            # Add standard text doc
-            documents.append(Document(
-                page_content=text,
-                metadata={
-                    "type": "text",
-                    "filename": pdf_path.name,
-                    "source": pdf_path.name,
-                    "page": page_index
-                }
-            ))
+    try:
+        for page_num in range(len(doc)):
+            page = doc[page_num]
+            page_index = page_num + 1
             
-        # 2. Extract Tables
-        try:
-            tables = page.find_tables()
-            for tab_idx, table in enumerate(tables):
-                table_data = table.extract()
-                table_md = list_to_markdown_table(table_data)
-                if table_md.strip():
-                    print(f"[DEBUG] Found table on page {page_index}")
-                    summary = generate_table_summary(table_md, api_key)
-                    documents.append(Document(
-                        page_content=table_md,
-                        metadata={
-                            "type": "table",
-                            "summary": summary,
-                            "filename": pdf_path.name,
-                            "source": pdf_path.name,
-                            "page": page_index
-                        }
-                    ))
-        except Exception as e:
-            print(f"[WARNING] Failed to extract tables on page {page_index}: {e}")
-
-        # 3. Extract Images
-        try:
-            image_list = page.get_images(full=True)
-            for img_idx, img in enumerate(image_list):
-                xref = img[0]
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-                image_ext = base_image["ext"]
-                
-                # Save to disk
-                img_name = f"{pdf_path.stem}_p{page_index}_img{img_idx}_{uuid.uuid4().hex[:6]}.{image_ext}"
-                img_path = extract_images_dir / img_name
-                
-                with open(img_path, "wb") as f:
-                    f.write(image_bytes)
-                
-                print(f"[DEBUG] Saved image {img_name} from page {page_index}")
-                
-                # Generate summary and add to documents
-                summary = generate_image_summary(str(img_path), api_key)
+            # 1. Extract Text Chunks
+            text = page.get_text()
+            if text.strip():
+                # Add standard text doc
                 documents.append(Document(
-                    page_content=summary,
+                    page_content=text,
                     metadata={
-                        "type": "image",
-                        "image_path": str(img_path),
+                        "type": "text",
                         "filename": pdf_path.name,
                         "source": pdf_path.name,
                         "page": page_index
                     }
                 ))
-        except Exception as e:
-            print(f"[WARNING] Failed to extract images on page {page_index}: {e}")
-            
-    doc.close()
+                
+            # 2. Extract Tables
+            try:
+                tables = page.find_tables()
+                for tab_idx, table in enumerate(tables):
+                    table_data = table.extract()
+                    table_md = list_to_markdown_table(table_data)
+                    if table_md.strip():
+                        print(f"[DEBUG] Found table on page {page_index}")
+                        summary = generate_table_summary(table_md, api_key)
+                        documents.append(Document(
+                            page_content=table_md,
+                            metadata={
+                                "type": "table",
+                                "summary": summary,
+                                "filename": pdf_path.name,
+                                "source": pdf_path.name,
+                                "page": page_index
+                            }
+                        ))
+            except Exception as e:
+                print(f"[WARNING] Failed to extract tables on page {page_index}: {e}")
+
+            # 3. Extract Images
+            try:
+                image_list = page.get_images(full=True)
+                for img_idx, img in enumerate(image_list):
+                    xref = img[0]
+                    base_image = doc.extract_image(xref)
+                    image_bytes = base_image["image"]
+                    image_ext = base_image["ext"]
+                    
+                    # Save to disk
+                    img_name = f"{pdf_path.stem}_p{page_index}_img{img_idx}_{uuid.uuid4().hex[:6]}.{image_ext}"
+                    img_path = extract_images_dir / img_name
+                    
+                    with open(img_path, "wb") as f:
+                        f.write(image_bytes)
+                    
+                    print(f"[DEBUG] Saved image {img_name} from page {page_index}")
+                    
+                    # Generate summary and add to documents
+                    summary = generate_image_summary(str(img_path), api_key)
+                    documents.append(Document(
+                        page_content=summary,
+                        metadata={
+                            "type": "image",
+                            "image_path": str(img_path),
+                            "filename": pdf_path.name,
+                            "source": pdf_path.name,
+                            "page": page_index
+                        }
+                    ))
+            except Exception as e:
+                print(f"[WARNING] Failed to extract images on page {page_index}: {e}")
+    finally:
+        doc.close()
+
     return documents
 
 def load_all_documents(data_dir: str, gemini_api_key: str = None) -> List[Document]:
@@ -205,7 +195,7 @@ def load_all_documents(data_dir: str, gemini_api_key: str = None) -> List[Docume
         documents.extend(loaded_docs)
 
     # TXT files
-    txt_files = list(data_path.glob('**/*.txt'))
+    txt_files = [f for f in data_path.glob('**/*.txt') if "extracted_images" not in f.parts]
     for txt_file in txt_files:
         try:
             loader = TextLoader(str(txt_file), encoding="utf-8")
@@ -214,7 +204,7 @@ def load_all_documents(data_dir: str, gemini_api_key: str = None) -> List[Docume
             print(f"[ERROR] Failed to load TXT {txt_file}: {e}")
 
     # CSV files
-    csv_files = list(data_path.glob('**/*.csv'))
+    csv_files = [f for f in data_path.glob('**/*.csv') if "extracted_images" not in f.parts]
     for csv_file in csv_files:
         try:
             loader = CSVLoader(str(csv_file))
@@ -223,7 +213,7 @@ def load_all_documents(data_dir: str, gemini_api_key: str = None) -> List[Docume
             print(f"[ERROR] Failed to load CSV {csv_file}: {e}")
 
     # Excel files
-    xlsx_files = list(data_path.glob('**/*.xlsx'))
+    xlsx_files = [f for f in data_path.glob('**/*.xlsx') if "extracted_images" not in f.parts]
     for xlsx_file in xlsx_files:
         try:
             loader = UnstructuredExcelLoader(str(xlsx_file))
@@ -232,7 +222,7 @@ def load_all_documents(data_dir: str, gemini_api_key: str = None) -> List[Docume
             print(f"[ERROR] Failed to load Excel {xlsx_file}: {e}")
 
     # Word files
-    docx_files = list(data_path.glob('**/*.docx'))
+    docx_files = [f for f in data_path.glob('**/*.docx') if "extracted_images" not in f.parts]
     for docx_file in docx_files:
         try:
             loader = Docx2txtLoader(str(docx_file))
@@ -241,7 +231,7 @@ def load_all_documents(data_dir: str, gemini_api_key: str = None) -> List[Docume
             print(f"[ERROR] Failed to load Word {docx_file}: {e}")
 
     # JSON files
-    json_files = list(data_path.glob('**/*.json'))
+    json_files = [f for f in data_path.glob('**/*.json') if "extracted_images" not in f.parts]
     for json_file in json_files:
         try:
             loader = JSONLoader(str(json_file))

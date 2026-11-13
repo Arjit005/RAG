@@ -23,13 +23,7 @@ from src.rag.llm.model_router import get_model_router
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-try:
-    # from rag.vectorstore import FaissVectorStore
-except Exception:
-    try:
-        # from vectorstore import FaissVectorStore
-    except Exception:
-        FaissVectorStore = None
+FaissVectorStore = None
 
 from src.rag.vector_store_factory import get_vector_store
 

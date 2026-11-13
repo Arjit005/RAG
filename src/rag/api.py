@@ -530,6 +530,57 @@ def debug_qdrant_check(current_user: AuthenticatedUser = Depends(get_current_use
         "collection_status": collection_status
     }
 
+@app.get("/api/debug/llm-test", tags=["General"])
+def debug_llm_test(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """Diagnostic endpoint to test each configured LLM provider directly."""
+    import requests
+    results = {}
+
+    # 1. Groq
+    groq_key = os.getenv("GROQ_API_KEY")
+    if groq_key:
+        try:
+            r = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {groq_key.strip()}"},
+                json={"model": "qwen/qwen3.8-27b", "messages": [{"role": "user", "content": "ping"}], "max_tokens": 5},
+                timeout=10
+            )
+            results["groq"] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:150]}
+        except Exception as e:
+            results["groq"] = {"error": str(e)}
+    else:
+        results["groq"] = {"error": "GROQ_API_KEY not set"}
+
+    # 2. Gemini
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key:
+        try:
+            r = requests.get(f"https://generativelanguage.googleapis.com/v1beta/models?key={gemini_key.strip()}", timeout=10)
+            results["gemini"] = {"status": r.status_code, "body": "OK" if r.status_code == 200 else r.text[:150]}
+        except Exception as e:
+            results["gemini"] = {"error": str(e)}
+    else:
+        results["gemini"] = {"error": "GEMINI_API_KEY not set"}
+
+    # 3. OpenRouter
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
+    if openrouter_key:
+        try:
+            r = requests.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {openrouter_key.strip()}"},
+                json={"model": "liquid/lfm-3-1.7b:free", "messages": [{"role": "user", "content": "ping"}], "max_tokens": 5},
+                timeout=10
+            )
+            results["openrouter"] = {"status": r.status_code, "body": r.json() if r.status_code == 200 else r.text[:150]}
+        except Exception as e:
+            results["openrouter"] = {"error": str(e)}
+    else:
+        results["openrouter"] = {"error": "OPENROUTER_API_KEY not set"}
+
+    return results
+
 @app.get("/api/health", response_model=HealthResponse, tags=["General"])
 def health_check(db: Session = Depends(get_db)):
     """

@@ -47,6 +47,8 @@ def get_vector_store(
             q_url = raw_url
 
         q_key = os.getenv("QDRANT_API_KEY")
+        if q_key:
+            q_key = q_key.strip()
 
         if is_production and not q_url:
             raise RuntimeError(

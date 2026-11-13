@@ -50,6 +50,8 @@ class QdrantVectorStore(BaseVectorStore):
             qdrant_url = raw_url
 
         qdrant_api_key = api_key or os.getenv("QDRANT_API_KEY")
+        if qdrant_api_key:
+            qdrant_api_key = qdrant_api_key.strip()
 
         if qdrant_url:
             self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)

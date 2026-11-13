@@ -91,8 +91,8 @@ def get_shared_vector_store():
     try:
         return get_vector_store()
     except Exception as e:
-        logger.warning(f"Failed to obtain centralized vector store: {e}")
-        return None
+        logger.exception(f"Failed to obtain centralized vector store: {e}")
+        raise e
 
 def get_rag_engine():
     global rag_engine

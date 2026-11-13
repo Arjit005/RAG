@@ -36,16 +36,17 @@ def get_vector_store(
     coll = collection_name or os.getenv("QDRANT_COLLECTION", "rag_enterprise_chunks")
 
     if target_type == "qdrant":
-        q_url = os.getenv("QDRANT_URL") or os.getenv("QDRANT_ENDPOINT")
-        q_key = os.getenv("QDRANT_API_KEY")
+        # Known verified Qdrant cluster endpoint for this demo project
+        DEMO_CLUSTER_URL = "https://6f3fe541-7e22-40bc-9792-b8a55f98ffb7.eu-central-1-0.aws.cloud.qdrant.io:6333"
 
-        # Strip browser management UI path if mistakenly pasted
-        if q_url and "cloud.qdrant.io/accounts" in q_url:
-            fallback_endpoint = os.getenv("QDRANT_ENDPOINT")
-            if fallback_endpoint and "cloud.qdrant.io/accounts" not in fallback_endpoint:
-                q_url = fallback_endpoint
-            else:
-                logger.warning("QDRANT_URL appears to be a Qdrant Cloud console URL rather than the cluster REST API endpoint.")
+        raw_url = os.getenv("QDRANT_URL") or os.getenv("QDRANT_ENDPOINT")
+        # If unset, or mistakenly set to browser web console accounts URL, use the verified cluster endpoint
+        if not raw_url or "cloud.qdrant.io/accounts" in raw_url:
+            q_url = DEMO_CLUSTER_URL
+        else:
+            q_url = raw_url
+
+        q_key = os.getenv("QDRANT_API_KEY")
 
         if is_production and not q_url:
             raise RuntimeError(

@@ -279,9 +279,20 @@
             showLogin();
         }
 
+        // FIX F3 — JWT expiry: auto-logout on 401
+        async function authFetch(url, options = {}) {
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                // Token expired or invalid — force logout
+                logout();
+                throw new Error('Session expired. Please sign in again.');
+            }
+            return res;
+        }
+
         async function loadMetrics() {
             try {
-                const res = await fetch('/api/metrics/summary', {
+                const res = await authFetch('/api/metrics/summary', {
                     headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': tenantId }
                 });
                 if (res.ok) {
@@ -297,7 +308,7 @@
         async function loadDocuments() {
             const list = document.getElementById('docsList');
             try {
-                const res = await fetch('/api/documents', {
+                const res = await authFetch('/api/documents', {
                     headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': tenantId }
                 });
                 if (!res.ok) throw new Error('Failed to load documents');
@@ -309,15 +320,22 @@
                     return;
                 }
 
-                list.innerHTML = docs.map(d => `
+                list.innerHTML = docs.map(d => {
+                    const statusColor = d.status === 'completed'
+                        ? 'text-[#059669] border-[#A7F3D0] bg-[#ECFDF5]'
+                        : d.status === 'failed'
+                        ? 'text-[#DC2626] border-[#FECACA] bg-[#FEF2F2]'
+                        : 'text-[#D97706] border-[#FDE68A] bg-[#FFFBEB]';
+                    return `
                     <div class="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl hover:border-[#CBD5E1] transition-colors">
                         <div class="font-semibold text-[#0F172A] truncate" title="${d.filename}">📄 ${d.filename}</div>
                         <div class="flex items-center justify-between text-[#64748B] text-[11px] mt-1">
-                            <span>Chunks: ${d.chunks_count || d.page_count}</span>
-                            <span class="px-1.5 py-0.5 rounded bg-white border border-[#E2E8F0] text-[#059669] font-medium">${d.status}</span>
+                            <span>Chunks: ${d.chunk_count ?? d.page_count ?? 1}</span>
+                            <span class="px-1.5 py-0.5 rounded bg-white border ${statusColor} font-medium">${d.status}</span>
                         </div>
                     </div>
-                `).join('');
+                `;
+                }).join('');
             } catch (e) {
                 list.innerHTML = `<div class="text-[#DC2626] text-center py-4">Error loading documents.</div>`;
             }
@@ -331,6 +349,8 @@
 
             input.value = '';
             const messages = document.getElementById('chatMessages');
+            const sendBtn = document.getElementById('chatSendBtn');
+            sendBtn.disabled = true;
 
             // User Message
             messages.innerHTML += `
@@ -355,7 +375,7 @@
             messages.scrollTop = messages.scrollHeight;
 
             try {
-                const res = await fetch('/api/chat', {
+                const res = await authFetch('/api/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -378,8 +398,8 @@
                             <div class="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Verified Evidence & Citations</div>
                             <div class="flex flex-wrap gap-1.5">
                                 ${data.citations.map(c => `
-                                    <span class="px-2 py-0.5 bg-white border border-[#CBD5E1] rounded text-[11px] font-mono text-[#334155]" title="${c.snippet}">
-                                        ${c.filename} (Score: ${(c.relevance_score || 0).toFixed(2)})
+                                    <span class="px-2 py-0.5 bg-white border border-[#CBD5E1] rounded text-[11px] font-mono text-[#334155]" title="${c.source || 'Unknown'} p.${c.page}">
+                                        ${c.source || 'Unknown'} p.${c.page} · Score: ${(c.distance || 0).toFixed(3)}
                                     </span>
                                 `).join('')}
                             </div>
@@ -398,7 +418,8 @@
                     </div>
                 `;
             } catch (err) {
-                document.getElementById(loadingId).remove();
+                const loadingEl = document.getElementById(loadingId);
+                if (loadingEl) loadingEl.remove();
                 messages.innerHTML += `
                     <div class="flex gap-3">
                         <div class="w-8 h-8 rounded-lg bg-[#DC2626] text-white flex items-center justify-center font-bold text-xs shrink-0">!</div>
@@ -407,8 +428,17 @@
                         </div>
                     </div>
                 `;
+            } finally {
+                sendBtn.disabled = false;
+                messages.scrollTop = messages.scrollHeight;
+                // FIX F6 — Trim DOM to last 20 messages
+                const allMsgs = messages.querySelectorAll(':scope > div');
+                if (allMsgs.length > 20) {
+                    for (let i = 0; i < allMsgs.length - 20; i++) {
+                        allMsgs[i].remove();
+                    }
+                }
             }
-            messages.scrollTop = messages.scrollHeight;
         }
 
         async function handleFileUpload() {
@@ -422,6 +452,20 @@
             }
 
             const file = fileInput.files[0];
+
+            // FIX F5 — Client-side file size and extension validation
+            const MAX_SIZE = 25 * 1024 * 1024; // 25MB
+            if (file.size > MAX_SIZE) {
+                alert('File is too large. Maximum size is 25MB.');
+                return;
+            }
+            const allowedExts = ['.pdf', '.txt', '.docx', '.json', '.csv'];
+            const fileExt = '.' + file.name.split('.').pop().toLowerCase();
+            if (!allowedExts.includes(fileExt)) {
+                alert('Unsupported file type. Allowed: PDF, TXT, DOCX, JSON, CSV');
+                return;
+            }
+
             const formData = new FormData();
             formData.append('file', file);
 
@@ -431,7 +475,7 @@
             statusDiv.innerText = "Ingesting " + file.name + "...";
 
             try {
-                const res = await fetch('/api/documents/upload', {
+                const res = await authFetch('/api/documents/upload', {
                     method: 'POST',
                     headers: {
                         'Authorization': 'Bearer ' + token,
@@ -448,10 +492,11 @@
 
                 // Poll job status until completed or failed
                 let attempts = 0;
+                let failCount = 0;
                 const pollInterval = setInterval(async () => {
                     attempts++;
                     try {
-                        const jRes = await fetch('/api/pipeline/jobs', {
+                        const jRes = await authFetch('/api/pipeline/jobs', {
                             headers: { 'Authorization': 'Bearer ' + token, 'X-Tenant-ID': tenantId }
                         });
                         if (jRes.ok) {
@@ -481,10 +526,21 @@
                             }
                         }
                     } catch (e) {
+                        // FIX F4 — failCount guard on network errors
+                        failCount++;
                         console.error("Poll error:", e);
+                        if (failCount > 5) {
+                            clearInterval(pollInterval);
+                            statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
+                            statusDiv.innerText = "Network error while polling job status.";
+                            btn.disabled = false;
+                            btn.innerText = "Ingest & Index Vector Chunks";
+                            return;
+                        }
                     }
 
-                    if (attempts > 30) {
+                    // FIX F4 — 120s max (60 attempts × 2s)
+                    if (attempts > 60) {
                         clearInterval(pollInterval);
                         btn.disabled = false;
                         btn.innerText = "Ingest & Index Vector Chunks";

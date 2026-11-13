@@ -44,6 +44,14 @@ services:
         sync: false # Set in Render Dashboard
       - key: EMBEDDING_MODEL
         value: all-MiniLM-L6-v2
+      - key: MALLOC_ARENA_MAX
+        value: "2"
+      - key: TORCH_NUM_THREADS
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: TOKENIZERS_PARALLELISM
+        value: "false"
       - key: DEFAULT_LLM_MODEL
         value: qwen/qwen3.8-27b
       - key: FRONTEND_URL

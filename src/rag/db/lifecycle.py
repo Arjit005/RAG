@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from src.rag.db.models import Document, DocumentChunk, IngestionStatus, SyncStatus
 from src.rag.db.repository import DocumentRepository
 from src.rag.vectorstore_base import BaseVectorStore
+
+logger = logging.getLogger(__name__)
 class DocumentLifecycleService:
     """
     Coordinates atomic document metadata transactions in PostgreSQL
@@ -60,7 +62,13 @@ class DocumentLifecycleService:
         # Step 3: Embed chunk texts
         embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
         if embed_texts:
-            embeddings = self.embedding_pipeline.model.encode(embed_texts).tolist()
+            # FIX WEAK-3: Batch embedding to avoid OOM on large documents
+            batch_size = 16
+            embeddings = []
+            for i in range(0, len(embed_texts), batch_size):
+                batch = embed_texts[i:i+batch_size]
+                batch_embeddings = self.embedding_pipeline.model.encode(batch, show_progress_bar=False).tolist()
+                embeddings.extend(batch_embeddings)
 
             # Step 4: Synchronize to Vector Store
             try:
@@ -129,29 +137,39 @@ class DocumentLifecycleService:
 
         reconciled_count = 0
         for doc_id, chunks in docs_map.items():
-            doc = self.repo.get_document(doc_id)
-            if not doc:
-                continue
-            embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
-            embeddings = self.embedding_pipeline.model.encode(embed_texts).tolist()
-            chunks_payload = [
-                {
-                    "id": c.id,
-                    "chunk_index": c.chunk_index,
-                    "page": c.page_number,
-                    "type": c.chunk_type,
-                    "text": c.content_text,
-                    "summary": c.summary_text,
-                    "filename": doc.filename,
-                    "source": doc.filename,
-                    "image_path": c.image_path
-                }
-                for c in chunks
-            ]
-            self.vector_store.add_documents(doc.tenant_id, doc.id, chunks_payload, embeddings)
-            self.repo.update_chunks_sync_status([c.id for c in chunks], SyncStatus.SYNCED)
-            doc.status = IngestionStatus.COMPLETED.value
-            reconciled_count += len(chunks)
+            # FIX WEAK-10: Per-document try/except so one failure doesn't abort all others
+            try:
+                doc = self.repo.get_document(doc_id)
+                if not doc:
+                    continue
+                embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
+                # Batch embedding (FIX WEAK-3 applied here too)
+                batch_size = 16
+                embeddings = []
+                for i in range(0, len(embed_texts), batch_size):
+                    batch = embed_texts[i:i+batch_size]
+                    batch_embeddings = self.embedding_pipeline.model.encode(batch, show_progress_bar=False).tolist()
+                    embeddings.extend(batch_embeddings)
+                chunks_payload = [
+                    {
+                        "id": c.id,
+                        "chunk_index": c.chunk_index,
+                        "page": c.page_number,
+                        "type": c.chunk_type,
+                        "text": c.content_text,
+                        "summary": c.summary_text,
+                        "filename": doc.filename,
+                        "source": doc.filename,
+                        "image_path": c.image_path
+                    }
+                    for c in chunks
+                ]
+                self.vector_store.add_documents(doc.tenant_id, doc.id, chunks_payload, embeddings)
+                self.repo.update_chunks_sync_status([c.id for c in chunks], SyncStatus.SYNCED)
+                doc.status = IngestionStatus.COMPLETED.value
+                reconciled_count += len(chunks)
+            except Exception as e:
+                logger.error(f"Failed to reconcile doc {doc_id}: {e}")
 
         self.db.commit()
         return reconciled_count

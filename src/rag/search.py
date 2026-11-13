@@ -75,13 +75,13 @@ class RAGSearch:
         # Initialize Gemini Multi-modal LLM
         if self.gemini_api_key:
             try:
-                # Use gemini-3.6-flash for advanced multi-modal synthesis
+                # Use gemini-2.0-flash for advanced multi-modal synthesis
                 self.gemini_llm = ChatGoogleGenerativeAI(
-                    model="gemini-3.6-flash",
+                    model="gemini-2.0-flash",
                     google_api_key=self.gemini_api_key,
                     temperature=0.0
                 )
-                print("[INFO] Gemini 3.6 Flash LLM initialized.")
+                print("[INFO] Gemini 2.0 Flash LLM initialized.")
             except Exception as e:
                 self.gemini_llm = None
                 print(f"[WARNING] Gemini LLM failed to initialize: {e}")

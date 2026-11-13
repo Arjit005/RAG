@@ -73,11 +73,11 @@ class ProviderHealth:
 
 # Registry of known models and verified failover targets
 DEFAULT_REGISTRY: List[ModelDescriptor] = [
-    # 1. Google Gemini (Preferred gemini-3.8-flash for new configs, fallback gemini-2.5-flash subject to high demand restrictions)
+    # 1. Google Gemini (gemini-2.0-flash / gemini-2.5-flash)
     ModelDescriptor(
         provider=ProviderType.GEMINI,
-        model_id="gemini-3.8-flash",
-        display_name="Google Gemini 3.8 Flash (Preferred)",
+        model_id="gemini-2.0-flash",
+        display_name="Google Gemini 2.0 Flash (Preferred)",
         tier=TierType.FREE,
         env_key_var="GEMINI_API_KEY",
         context_window=1048576,
@@ -401,12 +401,19 @@ class ModelRouter:
     ) -> str:
         """Executes provider-specific synchronous call."""
         if model_desc.provider == ProviderType.GEMINI:
+            import concurrent.futures
             from google import genai
             client = genai.Client(api_key=api_key)
-            resp = client.models.generate_content(
-                model=model_desc.model_id,
-                contents=prompt
-            )
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    client.models.generate_content,
+                    model=model_desc.model_id,
+                    contents=prompt
+                )
+                try:
+                    resp = future.result(timeout=25)
+                except concurrent.futures.TimeoutError:
+                    raise RuntimeError(f"Gemini API call timed out after 25 seconds")
             return resp.text.strip() if resp.text else ""
 
         elif model_desc.provider == ProviderType.OPENROUTER:

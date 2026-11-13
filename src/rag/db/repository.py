@@ -78,8 +78,8 @@ class DocumentRepository:
         """
         Idempotently writes document chunks. Removes existing chunks for this document if re-indexing.
         """
-        # Delete old chunks for this doc to guarantee no duplicates
-        self.db.query(DocumentChunk).filter(DocumentChunk.document_id == document_id).delete()
+        # FIX WEAK-9: Capture old chunk IDs first, write new chunks, then delete old chunks
+        old_chunk_ids = [c[0] for c in self.db.query(DocumentChunk.id).filter(DocumentChunk.document_id == document_id).all()]
 
         created_chunks = []
         for idx, item in enumerate(chunks_data):
@@ -100,6 +100,12 @@ class DocumentRepository:
             )
             self.db.add(chunk)
             created_chunks.append(chunk)
+
+        # Safely delete old chunks that are not in the new chunks set
+        new_ids = {c.id for c in created_chunks}
+        to_delete = [oid for oid in old_chunk_ids if oid not in new_ids]
+        if to_delete:
+            self.db.query(DocumentChunk).filter(DocumentChunk.id.in_(to_delete)).delete(synchronize_session=False)
 
         self.db.commit()
         return created_chunks

@@ -13,7 +13,7 @@ import datetime
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Header, Depends, BackgroundTasks, status
+from fastapi import FastAPI, File, UploadFile, HTTPException, Query, Header, Depends, BackgroundTasks, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -72,7 +72,7 @@ else:
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if env_mode in ("production", "prod") else ["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -102,7 +102,13 @@ def get_rag_engine():
         except ImportError:
             from search import RAGSearch
         v_store = get_shared_vector_store()
-        rag_engine = RAGSearch(vectorstore=v_store)
+        if v_store is None:
+            logger.warning("Vector store is None; RAGSearch will attempt its own store initialization.")
+        try:
+            rag_engine = RAGSearch(vectorstore=v_store)
+        except Exception as e:
+            logger.error(f"Failed to initialize RAG engine: {e}")
+            raise HTTPException(status_code=503, detail="RAG engine initialization failed.")
     return rag_engine
 
 # --- Security & Authentication Dependencies ---
@@ -366,6 +372,7 @@ def process_document_ingestion_job(
         if job:
             job.status = IngestionStatus.PROCESSING.value
             job.progress_percent = 20
+            job.updated_at = datetime.datetime.utcnow()
             db.commit()
 
         # Text extraction & chunking using dataloader logic
@@ -423,6 +430,7 @@ def process_document_ingestion_job(
 
         if job:
             job.progress_percent = 50
+            job.updated_at = datetime.datetime.utcnow()
             db.commit()
 
         # Lifecycle synchronization to DB and Qdrant
@@ -441,6 +449,7 @@ def process_document_ingestion_job(
             job.document_id = doc.id
             job.status = IngestionStatus.COMPLETED.value
             job.progress_percent = 100
+            job.updated_at = datetime.datetime.utcnow()
             db.commit()
 
     except Exception as e:
@@ -474,15 +483,12 @@ def liveness_probe():
     return {"status": "live", "service": "rag-intelligence-backend"}
 
 @app.get("/api/debug/db-check", tags=["General"])
-def debug_db_check():
-    """Diagnostic endpoint to inspect live database connectivity."""
+def debug_db_check(current_user: AuthenticatedUser = Depends(get_current_user)):
+    """Diagnostic endpoint to inspect live database connectivity. Requires authentication."""
     db_url = os.getenv("DATABASE_URL", "NOT_SET")
     from src.rag.db.database import mask_connection_url, SessionLocal
     masked_url = mask_connection_url(db_url)
-    
-    # List all set environment variable keys (without values for security)
-    set_keys = [k for k in os.environ.keys() if not k.startswith("_")]
-    
+
     try:
         db = SessionLocal()
         u = db.query(User).filter(User.email == "admin@enterprise.internal").first()
@@ -495,14 +501,12 @@ def debug_db_check():
         return {
             "status": "ok",
             "masked_url": masked_url,
-            "set_env_keys": set_keys,
             "user": user_info
         }
     except Exception as e:
         return {
             "status": "error",
             "masked_url": masked_url,
-            "set_env_keys": set_keys,
             "error": str(e),
             "type": type(e).__name__
         }
@@ -751,6 +755,7 @@ def delete_document(
 
 @app.post("/api/documents/upload", tags=["Documents"])
 async def upload_document(
+    request: Request,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     tenant_id: str = Depends(get_authorized_tenant),
@@ -762,7 +767,12 @@ async def upload_document(
     """
     ALLOWED_EXTENSIONS = {".pdf", ".txt", ".csv", ".docx", ".json"}
     MAX_FILE_SIZE = 25 * 1024 * 1024  # 25 MB limit
-    
+
+    # FIX WEAK-15: Early rejection using Content-Length header before reading into RAM
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File exceeds maximum allowed size of 25MB.")
+
     # Path traversal and filename sanitization
     safe_filename = Path(file.filename).name
     ext = Path(safe_filename).suffix.lower()

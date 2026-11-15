@@ -982,10 +982,12 @@ def list_pipeline_jobs(
 ):
     """
     Returns persisted ingestion job records for the authorized tenant.
-    Auto-recovers stalled zombie jobs that have been stuck in 'processing' for > 3 minutes.
+    Auto-recovers stalled zombie jobs that have been stuck in 'processing' for > 15 minutes.
     """
     now = datetime.datetime.utcnow()
-    stale_threshold = now - datetime.timedelta(minutes=3)
+    # Large multi-hundred-page documents can take 5-10 minutes under rate-limit pacing.
+    # Set stale watchdog to 15 minutes to prevent prematurely aborting active embedding pipelines.
+    stale_threshold = now - datetime.timedelta(minutes=15)
 
     stalled_jobs = db.query(IngestionJob).filter(
         IngestionJob.tenant_id == tenant_id,

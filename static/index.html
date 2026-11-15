@@ -701,15 +701,30 @@
                                 pBar.style.width = pct + '%';
                                 pText.innerText = pct + '%';
 
-                                if (pct >= 20 && pct < 40) {
+                                const defaultStepClass = 'text-slate-500 font-normal';
+                                document.getElementById('step-extract').className = defaultStepClass;
+                                document.getElementById('step-chunk').className = defaultStepClass;
+                                document.getElementById('step-embed').className = defaultStepClass;
+                                document.getElementById('step-sync').className = defaultStepClass;
+
+                                if (pct < 35) {
                                     pPhase.innerText = '1. Parsing & Structure Extraction...';
                                     document.getElementById('step-extract').className = 'text-cyan-400 font-bold';
-                                } else if (pct >= 40 && pct < 70) {
+                                } else if (pct >= 35 && pct < 50) {
                                     pPhase.innerText = '2. Recursive Text Chunking (1000 char windows)...';
+                                    document.getElementById('step-extract').className = 'text-emerald-400 font-normal';
                                     document.getElementById('step-chunk').className = 'text-cyan-400 font-bold';
-                                } else if (pct >= 70 && pct < 100) {
+                                } else if (pct >= 50 && pct < 85) {
                                     pPhase.innerText = '3. Zero-RAM Serverless Vector Embedding (384-dim)...';
+                                    document.getElementById('step-extract').className = 'text-emerald-400 font-normal';
+                                    document.getElementById('step-chunk').className = 'text-emerald-400 font-normal';
                                     document.getElementById('step-embed').className = 'text-cyan-400 font-bold';
+                                } else if (pct >= 85 && pct < 100) {
+                                    pPhase.innerText = '4. Synchronizing to Qdrant Cloud Index...';
+                                    document.getElementById('step-extract').className = 'text-emerald-400 font-normal';
+                                    document.getElementById('step-chunk').className = 'text-emerald-400 font-normal';
+                                    document.getElementById('step-embed').className = 'text-emerald-400 font-normal';
+                                    document.getElementById('step-sync').className = 'text-cyan-400 font-bold';
                                 }
 
                                 if (currentJob.status === 'completed') {
@@ -717,6 +732,9 @@
                                     pBar.style.width = '100%';
                                     pText.innerText = '100%';
                                     pPhase.innerText = '4. Vector Synced to Qdrant Cloud ✓';
+                                    document.getElementById('step-extract').className = 'text-emerald-400 font-normal';
+                                    document.getElementById('step-chunk').className = 'text-emerald-400 font-normal';
+                                    document.getElementById('step-embed').className = 'text-emerald-400 font-normal';
                                     document.getElementById('step-sync').className = 'text-emerald-400 font-bold';
 
                                     statusDiv.className = "text-xs mt-2 text-center text-emerald-400 font-mono block";
@@ -740,7 +758,7 @@
                     } catch (e) {
                         failCount++;
                         console.error("Poll error:", e);
-                        if (failCount > 5) {
+                        if (failCount > 10) {
                             clearInterval(pollInterval);
                             statusDiv.className = "text-xs mt-2 text-center text-rose-400 font-mono block";
                             statusDiv.innerText = "Network polling timeout.";
@@ -750,7 +768,7 @@
                         }
                     }
 
-                    if (attempts > 60) {
+                    if (attempts > 600) {
                         clearInterval(pollInterval);
                         btn.disabled = false;
                         btn.innerText = "Ingest & Index Vector Chunks";

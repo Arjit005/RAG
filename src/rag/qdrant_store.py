@@ -54,9 +54,9 @@ class QdrantVectorStore(BaseVectorStore):
             qdrant_api_key = qdrant_api_key.strip()
 
         if qdrant_url:
-            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            self.client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key, prefer_grpc=False, timeout=20.0)
         elif host and port:
-            self.client = QdrantClient(host=host, port=port, api_key=qdrant_api_key)
+            self.client = QdrantClient(host=host, port=port, api_key=qdrant_api_key, prefer_grpc=False, timeout=20.0)
         else:
             if env in ("production", "prod"):
                 raise RuntimeError(

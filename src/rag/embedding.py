@@ -96,30 +96,64 @@ class EmbeddingPipeline:
         self.gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
         logger.info(f"Initialized embedding pipeline. Serverless Gemini active: {bool(self.gemini_key)}")
 
-    def _embed_gemini(self, texts: List[str]) -> List[List[float]]:
-        """Generates 384-dimensional embeddings via Google Gemini REST API (zero server RAM)."""
+    def _embed_gemini(self, texts: List[str], max_retries: int = 5) -> List[List[float]]:
+        """Generates 384-dimensional embeddings via Google Gemini REST API with rate-limit backoff."""
         import json
         import urllib.request
+        import urllib.error
+        import time
+        import random
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={self.gemini_key}"
+        keys = [k.strip() for k in self.gemini_key.split(",") if k.strip()]
+        if not keys:
+            raise ValueError("No valid GEMINI_API_KEY configured.")
+
         requests_payload = [
             {
                 "model": "models/gemini-embedding-001",
-                "content": {"parts": [{"text": t[:4000] if (t and t.strip()) else "Empty"}]},
+                "content": {"parts": [{"text": t[:3000] if (t and t.strip()) else "Empty"}]},
                 "outputDimensionality": 384
             }
             for t in texts
         ]
 
-        req = urllib.request.Request(
-            url,
-            data=json.dumps({"requests": requests_payload}).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
-        )
+        data_bytes = json.dumps({"requests": requests_payload}).encode("utf-8")
 
-        with urllib.request.urlopen(req, timeout=25) as r:
-            res = json.loads(r.read().decode("utf-8"))
-            return [e["values"] for e in res["embeddings"]]
+        for attempt in range(max_retries):
+            current_key = keys[attempt % len(keys)]
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key={current_key}"
+            req = urllib.request.Request(
+                url,
+                data=data_bytes,
+                headers={"Content-Type": "application/json"}
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    res = json.loads(r.read().decode("utf-8"))
+                    return [e["values"] for e in res["embeddings"]]
+            except urllib.error.HTTPError as e:
+                if e.code == 429:
+                    if attempt < max_retries - 1:
+                        backoff = min((attempt + 1) * 5 + random.uniform(1.0, 3.0), 30)
+                        logger.warning(
+                            f"Gemini embedding 429 rate limit hit. Pausing for {backoff:.1f}s before retry "
+                            f"({attempt + 1}/{max_retries})..."
+                        )
+                        time.sleep(backoff)
+                        continue
+                    else:
+                        raise RuntimeError(
+                            f"Gemini API rate limit (429) hit repeatedly. "
+                            f"The provider quota was saturated. Please wait 1 minute and re-try."
+                        )
+                raise e
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                raise e
+
+        raise RuntimeError("Embedding extraction failed after retries.")
 
     @property
     def model(self):
@@ -151,20 +185,24 @@ class EmbeddingPipeline:
     def encode(self, texts: List[str], show_progress_bar: bool = False) -> np.ndarray:
         """
         Public encode interface for batches of strings.
-        Routes to Gemini Serverless Embeddings (384-dim) for 0 MB RAM usage.
+        Routes to Gemini Serverless Embeddings (384-dim) with adaptive rate limiting and 0 MB RAM usage.
         """
         if not texts:
             return np.array([], dtype=np.float32)
 
         # 1. Serverless API Strategy (Zero RAM, zero CPU bottleneck)
         if self.gemini_key:
+            import time
             try:
-                batch_size = 25
+                batch_size = 20
                 all_embs = []
                 for i in range(0, len(texts), batch_size):
                     batch = texts[i:i + batch_size]
                     batch_embs = self._embed_gemini(batch)
                     all_embs.extend(batch_embs)
+                    # Adaptive pacing between micro-batches to respect 15 RPM
+                    if i + batch_size < len(texts):
+                        time.sleep(1.5)
                 return np.array(all_embs, dtype=np.float32)
             except Exception as e:
                 logger.error(f"Gemini serverless embedding failed: {e}")

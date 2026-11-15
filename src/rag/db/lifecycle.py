@@ -75,13 +75,17 @@ class DocumentLifecycleService:
             embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
             batch_size = 25
             embeddings = []
-            for i in range(0, len(embed_texts), batch_size):
+            total_embed_texts = len(embed_texts)
+            for i in range(0, total_embed_texts, batch_size):
                 batch = embed_texts[i:i+batch_size]
                 batch_embeddings = self.embedding_pipeline.encode(batch, show_progress_bar=False).tolist()
                 embeddings.extend(batch_embeddings)
+                if progress_callback and total_embed_texts > 0:
+                    pct = 50 + int((len(embeddings) / total_embed_texts) * 35) # Smoothly scales from 50% to 85%
+                    progress_callback(pct, f"Embedded {len(embeddings)}/{total_embed_texts} chunks")
 
             if progress_callback:
-                progress_callback(75, f"Generated {len(embeddings)} dense embeddings")
+                progress_callback(85, f"Generated {len(embeddings)} dense embeddings")
 
             chunks_payload = [
                 {

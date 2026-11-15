@@ -404,12 +404,22 @@ def process_document_ingestion_job(
                 page_count = len(doc_pdf)
                 from langchain_text_splitters import RecursiveCharacterTextSplitter
                 splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+
                 for page_num in range(page_count):
-                    p_text = doc_pdf[page_num].get_text()
-                    if p_text.strip():
-                        chunks_for_page = splitter.split_text(p_text)
+                    page = doc_pdf[page_num]
+                    # Extract text blocks preserving paragraph structure
+                    blocks = page.get_text("blocks")
+                    block_texts = [b[4].strip() for b in blocks if len(b) > 4 and b[4].strip()]
+                    
+                    if block_texts:
+                        combined_page_text = "\n\n".join(block_texts)
+                    else:
+                        combined_page_text = page.get_text().strip()
+
+                    if combined_page_text:
+                        chunks_for_page = splitter.split_text(combined_page_text)
                         if not chunks_for_page:
-                            chunks_for_page = [p_text.strip()]
+                            chunks_for_page = [combined_page_text]
                         for c_idx, sub_chunk in enumerate(chunks_for_page):
                             raw_chunks.append({
                                 "text": sub_chunk,
@@ -892,6 +902,34 @@ async def upload_document(
             detail=f"File exceeds maximum allowed size of 25MB."
         )
 
+    # Pre-Ingestion Deduplication Check by SHA-256
+    import hashlib
+    content_hash = hashlib.sha256(content).hexdigest()
+    repo = DocumentRepository(db)
+    existing_doc = repo.get_document_by_hash(tenant_id, content_hash)
+    if existing_doc and existing_doc.status == IngestionStatus.COMPLETED.value:
+        # Instant completion without running chunking or heavy ML embedding
+        job_id = f"job-{uuid.uuid4().hex[:12]}"
+        now = datetime.datetime.utcnow()
+        instant_job = IngestionJob(
+            id=job_id,
+            tenant_id=tenant_id,
+            document_id=existing_doc.id,
+            status=IngestionStatus.COMPLETED.value,
+            progress_percent=100,
+            created_at=now,
+            updated_at=now
+        )
+        db.add(instant_job)
+        db.commit()
+        return {
+            "status": "completed",
+            "job_id": job_id,
+            "filename": safe_filename,
+            "tenant_id": tenant_id,
+            "message": "Identical document already indexed in Knowledge Base (deduplicated)."
+        }
+
     # Register initial IngestionJob record
     job_id = f"job-{uuid.uuid4().hex[:12]}"
     job = IngestionJob(
@@ -955,7 +993,28 @@ def list_pipeline_jobs(
 ):
     """
     Returns persisted ingestion job records for the authorized tenant.
+    Auto-recovers stalled zombie jobs that have been stuck in 'processing' for > 3 minutes.
     """
+    now = datetime.datetime.utcnow()
+    stale_threshold = now - datetime.timedelta(minutes=3)
+
+    stalled_jobs = db.query(IngestionJob).filter(
+        IngestionJob.tenant_id == tenant_id,
+        IngestionJob.status == IngestionStatus.PROCESSING.value,
+        IngestionJob.updated_at < stale_threshold
+    ).all()
+
+    if stalled_jobs:
+        for s_job in stalled_jobs:
+            s_job.status = IngestionStatus.FAILED.value
+            s_job.error_message = "Job timed out or worker restarted during embedding generation."
+            s_job.updated_at = now
+        try:
+            db.commit()
+        except Exception as commit_err:
+            logger.warning(f"Failed to auto-recover stalled jobs: {commit_err}")
+            db.rollback()
+
     jobs = db.query(IngestionJob).filter(
         IngestionJob.tenant_id == tenant_id
     ).order_by(IngestionJob.created_at.desc()).limit(limit).all()

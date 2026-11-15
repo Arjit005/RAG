@@ -6,38 +6,134 @@
     <title>RAG Intelligence — Enterprise Platform</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; }
-        code, pre { font-family: 'JetBrains Mono', monospace; }
+        :root {
+            --bg-base: #06080E;
+            --surface-card: rgba(13, 18, 30, 0.75);
+            --surface-border: rgba(255, 255, 255, 0.08);
+            --cyan-accent: #38BDF8;
+            --emerald-pulse: #10B981;
+            --indigo-glow: #6366F1;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-base);
+            color: #F1F5F9;
+            overflow-x: hidden;
+        }
+
+        code, pre, .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* MotionSites Obsidian Glass Panel */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(226, 232, 240, 0.8);
+            background: var(--surface-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--surface-border);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+
+        .glass-panel-hover:hover {
+            border-color: rgba(56, 189, 248, 0.25);
+            box-shadow: 0 12px 40px -10px rgba(56, 189, 248, 0.15);
+            transition: all 0.25s ease;
+        }
+
+        /* ReactBits Shimmer & Glow Effects */
+        .shimmer-text {
+            background: linear-gradient(90deg, #F8FAFC 0%, #38BDF8 50%, #F8FAFC 100%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: shine 4s linear infinite;
+        }
+
+        @keyframes shine {
+            to { background-position: 200% center; }
+        }
+
+        /* Conduit Pulse Stepper */
+        .step-pulse {
+            position: relative;
+        }
+        .step-pulse::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 9999px;
+            border: 2px solid #38BDF8;
+            opacity: 0;
+            animation: ripple 1.8s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+        }
+
+        @keyframes ripple {
+            0% { transform: scale(0.8); opacity: 0.8; }
+            100% { transform: scale(1.6); opacity: 0; }
+        }
+
+        /* Ambient Radial Stage Glow */
+        .stage-glow {
+            position: fixed;
+            top: -20%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, rgba(99, 102, 241, 0.05) 50%, transparent 80%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 9999px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.4);
         }
     </style>
 </head>
-<body class="bg-[#F8FAFC] text-[#0F172A] min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col relative selection:bg-cyan-500/30 selection:text-cyan-200">
+
+    <!-- Ambient Glow Background -->
+    <div class="stage-glow"></div>
 
     <!-- Top Navigation Bar -->
-    <header class="bg-white border-b border-[#E2E8F0] sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header class="glass-panel sticky top-0 z-40 border-b border-white/[0.08]">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between relative z-10">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-[#2563EB] text-white flex items-center justify-center font-bold text-xl shadow-sm">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 via-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-lg shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-white/20">
                     ⚡
                 </div>
                 <div>
-                    <h1 class="font-bold text-[#0F172A] text-lg leading-tight">RAG Intelligence</h1>
-                    <p class="text-xs text-[#64748B]">Enterprise Multimodal Research Platform</p>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-extrabold text-white text-base sm:text-lg tracking-tight">RAG Intelligence</h1>
+                        <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-400 font-semibold tracking-wider">Obsidian v2</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 font-medium">Enterprise Multimodal Research Platform</p>
                 </div>
             </div>
+            
             <div class="flex items-center gap-3">
-                <div id="authStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA]">
-                    <span class="w-2 h-2 rounded-full bg-[#DC2626]"></span>
+                <div id="authStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono bg-rose-950/60 text-rose-400 border border-rose-800/60">
+                    <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
                     <span id="authStatusText">Not Authenticated</span>
                 </div>
-                <button id="logoutBtn" onclick="logout()" class="hidden px-3 py-1.5 text-xs font-semibold text-[#DC2626] hover:bg-[#FEE2E2] rounded-lg border border-[#FECACA] transition-colors">
+                <button id="logoutBtn" onclick="logout()" class="hidden px-3 py-1.5 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/80 rounded-lg border border-rose-800/60 transition-all cursor-pointer">
                     Sign Out
                 </button>
             </div>
@@ -45,40 +141,41 @@
     </header>
 
     <!-- Main Container -->
-    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+    <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full relative z-10">
 
         <!-- 1. LOGIN SECTION -->
-        <section id="loginSection" class="max-w-md mx-auto my-8">
-            <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-8">
+        <section id="loginSection" class="max-w-md mx-auto my-12">
+            <div class="glass-panel rounded-2xl p-8 border border-white/10 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] relative overflow-hidden">
+                <div class="absolute -top-12 -right-12 w-36 h-36 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
                 <div class="mb-6 text-center">
-                    <h2 class="text-xl font-bold text-[#0F172A]">Welcome to Portfolio Demo</h2>
-                    <p class="text-sm text-[#64748B] mt-1">Sign in to query indexed enterprise documents.</p>
+                    <h2 class="text-2xl font-bold tracking-tight text-white shimmer-text">Enterprise Portal</h2>
+                    <p class="text-xs text-slate-400 mt-1">Authenticate to access verified neural knowledge graphs.</p>
                 </div>
 
-                <div id="loginAlert" class="hidden mb-4 p-3 rounded-xl text-sm"></div>
+                <div id="loginAlert" class="hidden mb-4 p-3 rounded-xl text-xs font-mono border"></div>
 
                 <form onsubmit="handleLogin(event)" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-[#334155] uppercase tracking-wider mb-1">Email</label>
-                        <input type="email" id="loginEmail" required value="admin@enterprise.internal" class="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]">
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Email Address</label>
+                        <input type="email" id="loginEmail" required value="admin@enterprise.internal" class="w-full px-3.5 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-all">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-[#334155] uppercase tracking-wider mb-1">Password</label>
-                        <input type="password" id="loginPassword" required value="EnterpriseAdmin2026!" class="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]">
+                        <label class="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Security Token / Password</label>
+                        <input type="password" id="loginPassword" required value="EnterpriseAdmin2026!" class="w-full px-3.5 py-2.5 bg-slate-900/80 border border-white/10 rounded-xl text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-all">
                     </div>
-                    <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 px-4 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-medium text-sm rounded-xl transition-colors shadow-sm">
-                        Sign In with Demo Account
+                    <button type="submit" id="loginSubmitBtn" class="w-full py-2.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-[0_0_20px_rgba(56,189,248,0.3)] cursor-pointer">
+                        Authenticate Console
                     </button>
                 </form>
 
-                <div class="mt-6 pt-5 border-t border-[#F1F5F9] text-xs text-[#64748B]">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="font-semibold text-[#1E293B]">Demo Account:</span>
-                        <span class="text-[#2563EB] font-mono">admin@enterprise.internal</span>
+                <div class="mt-6 pt-5 border-t border-white/[0.08] text-xs text-slate-400 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-500">Demo Identity:</span>
+                        <span class="text-cyan-400 font-mono text-[11px]">admin@enterprise.internal</span>
                     </div>
                     <div class="flex items-center justify-between">
-                        <span class="font-semibold text-[#1E293B]">Default Tenant:</span>
-                        <span class="text-[#059669] font-mono">default-tenant</span>
+                        <span class="text-slate-500">Security Context:</span>
+                        <span class="text-emerald-400 font-mono text-[11px]">default-tenant</span>
                     </div>
                 </div>
             </div>
@@ -87,27 +184,48 @@
         <!-- 2. DASHBOARD & RESEARCH WORKSPACE -->
         <section id="workspaceSection" class="hidden space-y-6">
 
-            <!-- Metrics Overview Cards -->
+            <!-- Metrics Overview Cards (ReactBits CountUp & Halo Badges) -->
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
-                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Indexed Documents</div>
-                    <div id="metricDocs" class="text-2xl font-bold text-[#0F172A]">-</div>
-                    <div class="text-xs text-[#16A34A] mt-1 font-medium">PostgreSQL Neon DB</div>
+                <div class="glass-panel glass-panel-hover rounded-xl p-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Indexed Documents</span>
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34D399]"></span>
+                    </div>
+                    <div id="metricDocs" class="text-3xl font-extrabold text-white tracking-tight">0</div>
+                    <div class="text-[11px] text-emerald-400/90 mt-1.5 font-medium flex items-center gap-1">
+                        <span>●</span> Neon PostgreSQL Pooler
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
-                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Vector Chunks</div>
-                    <div id="metricChunks" class="text-2xl font-bold text-[#0F172A]">-</div>
-                    <div class="text-xs text-[#2563EB] mt-1 font-medium">Qdrant Cloud (384-dim)</div>
+
+                <div class="glass-panel glass-panel-hover rounded-xl p-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Vector Chunks</span>
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_#38BDF8]"></span>
+                    </div>
+                    <div id="metricChunks" class="text-3xl font-extrabold text-white tracking-tight">0</div>
+                    <div class="text-[11px] text-cyan-400/90 mt-1.5 font-medium flex items-center gap-1">
+                        <span>●</span> Qdrant Cloud (384-dim)
+                    </div>
                 </div>
-                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
-                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Embedding Model</div>
-                    <div class="text-sm font-bold text-[#0F172A] truncate" title="all-MiniLM-L6-v2">all-MiniLM-L6-v2</div>
-                    <div class="text-xs text-[#64748B] mt-1">Cosine Distance</div>
+
+                <div class="glass-panel glass-panel-hover rounded-xl p-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Embedding Model</span>
+                        <span class="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded border border-white/5">Dense</span>
+                    </div>
+                    <div class="text-base font-bold text-white truncate font-mono" title="all-MiniLM-L6-v2">all-MiniLM-L6-v2</div>
+                    <div class="text-[11px] text-slate-400 mt-1.5">Cosine Similarity Metric</div>
                 </div>
-                <div class="bg-white rounded-xl border border-[#E2E8F0] p-5 shadow-xs">
-                    <div class="text-xs font-semibold text-[#64748B] uppercase tracking-wider mb-1">Active LLM Router</div>
-                    <div id="metricLLM" class="text-sm font-bold text-[#0F172A]">Groq / Gemini</div>
-                    <div class="text-xs text-[#059669] mt-1 font-medium">Auto-Failover Active</div>
+
+                <div class="glass-panel glass-panel-hover rounded-xl p-5 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Active LLM Router</span>
+                        <span class="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_8px_#818CF8]"></span>
+                    </div>
+                    <div id="metricLLM" class="text-base font-bold text-white font-mono">Groq / Gemini</div>
+                    <div class="text-[11px] text-indigo-400/90 mt-1.5 font-medium flex items-center gap-1">
+                        <span>●</span> Auto-Failover Enabled
+                    </div>
                 </div>
             </div>
 
@@ -115,30 +233,35 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 <!-- Chat & Query Interface -->
-                <div class="lg:col-span-2 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col h-[600px]">
-                    <div class="px-6 py-4 border-b border-[#E2E8F0] flex items-center justify-between">
-                        <div>
-                            <h3 class="font-bold text-[#0F172A]">AI Research Workspace</h3>
-                            <p class="text-xs text-[#64748B]">Hybrid Dense + BM25 Search with FlashRank Re-ranking</p>
+                <div class="lg:col-span-2 glass-panel rounded-2xl flex flex-col h-[650px] relative overflow-hidden border border-white/10">
+                    <div class="px-6 py-4 border-b border-white/[0.08] flex items-center justify-between bg-slate-900/40">
+                        <div class="flex items-center gap-3">
+                            <div class="w-2.5 h-2.5 rounded-full bg-emerald-400 shadow-[0_0_10px_#34D399]"></div>
+                            <div>
+                                <h3 class="font-bold text-white text-sm sm:text-base tracking-tight">AI Research Console</h3>
+                                <p class="text-[11px] text-slate-400">Hybrid Dense + BM25 Sparse Search with FlashRank Re-ranking</p>
+                            </div>
                         </div>
-                        <span class="px-2.5 py-1 bg-[#EEF2FF] text-[#4F46E5] rounded-full text-xs font-medium">RAG Active</span>
+                        <span class="px-3 py-1 bg-cyan-950/80 text-cyan-300 border border-cyan-800/80 rounded-full text-[11px] font-mono font-semibold">RAG Active</span>
                     </div>
 
                     <!-- Chat Messages List -->
                     <div id="chatMessages" class="flex-1 p-6 overflow-y-auto space-y-4 text-sm">
                         <div class="flex gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
-                            <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#1E293B] max-w-[85%] leading-relaxed">
-                                Welcome! I am connected to your enterprise knowledge base. You can ask any question about the indexed research papers (like Self-Attention mechanism, Transformer architecture, embeddings, etc.).
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm border border-white/10">
+                                AI
+                            </div>
+                            <div class="bg-slate-900/70 border border-white/10 rounded-2xl p-4 text-slate-200 max-w-[85%] leading-relaxed shadow-sm">
+                                Welcome! I am synchronized with your enterprise knowledge repository. Ask any question grounded in your uploaded research papers, technical manuals, or corporate data.
                             </div>
                         </div>
                     </div>
 
                     <!-- Chat Input Form -->
-                    <div class="p-4 border-t border-[#E2E8F0] bg-[#F8FAFC] rounded-b-2xl">
+                    <div class="p-4 border-t border-white/[0.08] bg-slate-900/60 rounded-b-2xl">
                         <form onsubmit="submitQuestion(event)" class="flex gap-2">
-                            <input type="text" id="chatInput" placeholder="Ask a question grounded in verified documents..." class="flex-1 px-4 py-2.5 bg-white border border-[#CBD5E1] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]">
-                            <button type="submit" id="chatSendBtn" class="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-sm font-semibold transition-colors flex items-center gap-1.5 shrink-0">
+                            <input type="text" id="chatInput" placeholder="Ask a question grounded in verified documents..." class="flex-1 px-4 py-3 bg-slate-950/80 border border-white/10 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40 focus:border-cyan-500 transition-all font-normal">
+                            <button type="submit" id="chatSendBtn" class="px-5 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 rounded-xl text-sm font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-[0_0_15px_rgba(56,189,248,0.25)] cursor-pointer">
                                 <span>Send</span>
                                 <span>→</span>
                             </button>
@@ -149,36 +272,58 @@
                 <!-- Right Column: Upload Document & Knowledge Base -->
                 <div class="space-y-6 flex flex-col">
 
-                    <!-- Direct Upload Card -->
-                    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6">
-                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-[#F1F5F9]">
-                            <h3 class="font-bold text-[#0F172A] flex items-center gap-2">
-                                <svg class="w-4 h-4 text-[#2563EB]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                    <!-- Direct Upload Card with Live Pipeline Stepper -->
+                    <div class="glass-panel glass-panel-hover rounded-2xl p-6 border border-white/10">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-white/[0.08]">
+                            <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                                 Upload & Index Document
                             </h3>
-                            <span class="text-[10px] font-semibold text-[#2563EB] bg-[#EFF6FF] px-2 py-0.5 rounded">RAG Ingestion</span>
+                            <span class="text-[10px] font-mono font-semibold text-cyan-400 bg-cyan-950/80 border border-cyan-800/80 px-2 py-0.5 rounded">Neural Ingestion</span>
                         </div>
-                        <p class="text-xs text-[#64748B] mb-3">Upload research papers, PDFs, or text files to index into vector database.</p>
-                        <input type="file" id="fileUploadInput" accept=".pdf,.txt,.docx,.md" class="block w-full text-xs text-[#64748B] file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#EEF2FF] file:text-[#4F46E5] hover:file:bg-[#E0E7FF] cursor-pointer border border-[#E2E8F0] rounded-lg p-1.5 bg-[#F8FAFC]">
-                        <button onclick="handleFileUpload()" id="uploadBtn" class="w-full mt-3 py-2.5 px-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white rounded-xl text-xs font-semibold transition-all shadow-sm flex items-center justify-center gap-2">
+                        <p class="text-xs text-slate-400 mb-3">Upload research papers (PDF), TXT, or DOCX to chunk, embed, and synchronize into Qdrant Cloud.</p>
+                        
+                        <div class="relative">
+                            <input type="file" id="fileUploadInput" accept=".pdf,.txt,.docx,.md" class="block w-full text-xs text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-cyan-950 file:text-cyan-400 hover:file:bg-cyan-900 cursor-pointer border border-white/10 rounded-lg p-1.5 bg-slate-950/60">
+                        </div>
+
+                        <!-- Interactive Ingestion Visualizer Stepper (ReactBits / MotionSites) -->
+                        <div id="pipelineStepper" class="hidden mt-4 p-3 bg-slate-950/80 border border-white/10 rounded-xl space-y-2">
+                            <div class="flex items-center justify-between text-[11px] font-mono text-slate-300">
+                                <span id="pipelinePhaseText">1. Parsing & Chunking...</span>
+                                <span id="pipelinePercentText" class="text-cyan-400 font-bold">20%</span>
+                            </div>
+                            <!-- Conduit Bar -->
+                            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div id="pipelineProgressBar" class="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-500 w-[20%]"></div>
+                            </div>
+                            <div class="grid grid-cols-4 text-[9px] font-mono text-center pt-1 text-slate-500">
+                                <span id="step-extract" class="text-cyan-400 font-bold">Extract</span>
+                                <span id="step-chunk" class="text-slate-400">Chunk</span>
+                                <span id="step-embed" class="text-slate-500">Embed</span>
+                                <span id="step-sync" class="text-slate-500">Sync</span>
+                            </div>
+                        </div>
+
+                        <button onclick="handleFileUpload()" id="uploadBtn" class="w-full mt-3 py-2.5 px-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(56,189,248,0.2)] flex items-center justify-center gap-2 cursor-pointer">
                             <span>Ingest & Index Vector Chunks</span>
                         </button>
                         <div id="uploadStatus" class="text-xs mt-2 text-center hidden"></div>
                     </div>
 
                     <!-- Knowledge Base Inventory -->
-                    <div class="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm p-6 flex flex-col h-[380px]">
-                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-[#F1F5F9]">
-                            <h3 class="font-bold text-[#0F172A] flex items-center gap-2">
-                                <svg class="w-4 h-4 text-[#64748B]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    <div class="glass-panel glass-panel-hover rounded-2xl p-6 flex flex-col h-[380px] border border-white/10">
+                        <div class="flex items-center justify-between mb-3 pb-2 border-b border-white/[0.08]">
+                            <h3 class="font-bold text-white text-sm flex items-center gap-2">
+                                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                                 Knowledge Base
                             </h3>
-                            <span id="docCountBadge" class="text-xs font-medium text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded">0 Docs</span>
+                            <span id="docCountBadge" class="text-xs font-mono font-medium text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded">0 Docs</span>
                         </div>
 
                         <!-- Document List Container -->
                         <div id="docsList" class="flex-1 overflow-y-auto space-y-2 text-xs pr-1">
-                            <div class="text-[#94A3B8] text-center py-8">Loading document inventory...</div>
+                            <div class="text-slate-500 text-center py-8">Loading document inventory...</div>
                         </div>
                     </div>
 
@@ -190,12 +335,13 @@
     </main>
 
     <!-- Footer -->
-    <footer class="bg-white border-t border-[#E2E8F0] py-4 mt-auto">
-        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-[#64748B] flex flex-col sm:flex-row items-center justify-between gap-2">
-            <div>RAG Intelligence Enterprise Portfolio Edition • Render Free Deployment</div>
-            <div class="flex items-center gap-4">
-                <a href="/docs" target="_blank" class="hover:text-[#2563EB] transition-colors">API Docs (/docs)</a>
-                <a href="/api/health" target="_blank" class="hover:text-[#2563EB] transition-colors">System Health (/api/health)</a>
+    <footer class="glass-panel border-t border-white/[0.08] py-4 mt-auto relative z-10">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-2">
+            <div>RAG Intelligence Enterprise Portfolio Edition • Render Cloud Production</div>
+            <div class="flex items-center gap-4 font-mono">
+                <a href="/docs" target="_blank" class="hover:text-cyan-400 transition-colors">API Docs (/docs)</a>
+                <span class="text-slate-600">|</span>
+                <a href="/api/health" target="_blank" class="hover:text-cyan-400 transition-colors">System Health (/api/health)</a>
             </div>
         </div>
     </footer>
@@ -216,6 +362,20 @@
             return String(text).replace(/[&<>"']/g, m => map[m]);
         }
 
+        /* ReactBits CountUp animation helper */
+        function animateValue(obj, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                obj.innerText = Math.floor(progress * (end - start) + start);
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
         window.addEventListener('DOMContentLoaded', () => {
             if (token) {
                 showWorkspace();
@@ -231,7 +391,7 @@
             document.getElementById('workspaceSection').classList.add('hidden');
             document.getElementById('logoutBtn').classList.add('hidden');
             const badge = document.getElementById('authStatusBadge');
-            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#FEF2F2] text-[#DC2626] border border-[#FECACA]";
+            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono bg-rose-950/60 text-rose-400 border border-rose-800/60";
             document.getElementById('authStatusText').innerText = "Not Authenticated";
         }
 
@@ -240,7 +400,7 @@
             document.getElementById('workspaceSection').classList.remove('hidden');
             document.getElementById('logoutBtn').classList.remove('hidden');
             const badge = document.getElementById('authStatusBadge');
-            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-[#ECFDF5] text-[#059669] border border-[#A7F3D0]";
+            badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono bg-emerald-950/60 text-emerald-400 border border-emerald-800/60";
             document.getElementById('authStatusText').innerText = "Authenticated (" + tenantId + ")";
         }
 
@@ -252,7 +412,7 @@
             const alert = document.getElementById('loginAlert');
 
             btn.disabled = true;
-            btn.innerText = "Signing in...";
+            btn.innerText = "Authenticating...";
             alert.className = "hidden";
 
             try {
@@ -276,11 +436,11 @@
                 loadMetrics();
                 loadDocuments();
             } catch (err) {
-                alert.className = "mb-4 p-3 rounded-xl text-sm bg-[#FEF2F2] text-[#991B1B] border border-[#FECACA] block";
+                alert.className = "mb-4 p-3 rounded-xl text-xs font-mono bg-rose-950/80 text-rose-300 border border-rose-800/80 block";
                 alert.innerText = "Error: " + err.message;
             } finally {
                 btn.disabled = false;
-                btn.innerText = "Sign In with Demo Account";
+                btn.innerText = "Authenticate Console";
             }
         }
 
@@ -291,11 +451,9 @@
             showLogin();
         }
 
-        // FIX F3 — JWT expiry: auto-logout on 401
         async function authFetch(url, options = {}) {
             const res = await fetch(url, options);
             if (res.status === 401) {
-                // Token expired or invalid — force logout
                 logout();
                 throw new Error('Session expired. Please sign in again.');
             }
@@ -309,8 +467,10 @@
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    document.getElementById('metricDocs').innerText = data.total_documents || 0;
-                    document.getElementById('metricChunks').innerText = data.total_chunks || 0;
+                    const docsEl = document.getElementById('metricDocs');
+                    const chunksEl = document.getElementById('metricChunks');
+                    animateValue(docsEl, 0, data.total_documents || 0, 800);
+                    animateValue(chunksEl, 0, data.total_chunks || 0, 1000);
                 }
             } catch (e) {
                 console.error(e);
@@ -328,30 +488,34 @@
                 document.getElementById('docCountBadge').innerText = docs.length + ' Docs';
 
                 if (docs.length === 0) {
-                    list.innerHTML = '<div class="text-[#94A3B8] text-center py-6">No documents indexed yet.</div>';
+                    list.innerHTML = '<div class="text-slate-500 text-center py-6 font-mono">No documents indexed yet.</div>';
                     return;
                 }
 
                 list.innerHTML = docs.map(d => {
-                    const statusColor = d.status === 'completed'
-                        ? 'text-[#059669] border-[#A7F3D0] bg-[#ECFDF5]'
-                        : d.status === 'failed'
-                        ? 'text-[#DC2626] border-[#FECACA] bg-[#FEF2F2]'
-                        : 'text-[#D97706] border-[#FDE68A] bg-[#FFFBEB]';
+                    const isCompleted = d.status === 'completed';
+                    const isFailed = d.status === 'failed';
+                    const badgeClasses = isCompleted
+                        ? 'text-emerald-400 border-emerald-800/80 bg-emerald-950/60'
+                        : isFailed
+                        ? 'text-rose-400 border-rose-800/80 bg-rose-950/60'
+                        : 'text-amber-400 border-amber-800/80 bg-amber-950/60 animate-pulse';
                     const safeFilename = escapeHtml(d.filename);
                     const safeStatus = escapeHtml(d.status);
                     return `
-                    <div class="p-3 bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl hover:border-[#CBD5E1] transition-colors">
-                        <div class="font-semibold text-[#0F172A] truncate" title="${safeFilename}">📄 ${safeFilename}</div>
-                        <div class="flex items-center justify-between text-[#64748B] text-[11px] mt-1">
+                    <div class="p-3 bg-slate-900/60 border border-white/[0.08] rounded-xl hover:border-cyan-500/40 transition-all">
+                        <div class="font-semibold text-slate-100 truncate flex items-center gap-1.5" title="${safeFilename}">
+                            <span class="text-cyan-400">📄</span> ${safeFilename}
+                        </div>
+                        <div class="flex items-center justify-between text-slate-400 text-[11px] mt-1.5 font-mono">
                             <span>Chunks: ${d.chunk_count ?? d.page_count ?? 1}</span>
-                            <span class="px-1.5 py-0.5 rounded bg-white border ${statusColor} font-medium">${safeStatus}</span>
+                            <span class="px-2 py-0.5 rounded border ${badgeClasses} text-[10px] font-semibold">${safeStatus}</span>
                         </div>
                     </div>
                 `;
                 }).join('');
             } catch (e) {
-                list.innerHTML = `<div class="text-[#DC2626] text-center py-4">Error loading documents.</div>`;
+                list.innerHTML = `<div class="text-rose-400 text-center py-4 font-mono">Error loading documents.</div>`;
             }
         }
 
@@ -370,7 +534,7 @@
             const safeQuery = escapeHtml(q);
             messages.innerHTML += `
                 <div class="flex gap-3 justify-end">
-                    <div class="bg-[#2563EB] text-white rounded-2xl p-4 max-w-[85%] leading-relaxed shadow-xs">
+                    <div class="bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-medium rounded-2xl p-4 max-w-[85%] leading-relaxed shadow-sm">
                         ${safeQuery}
                     </div>
                 </div>
@@ -381,9 +545,10 @@
             const loadingId = 'loading-' + Date.now();
             messages.innerHTML += `
                 <div id="${loadingId}" class="flex gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
-                    <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#64748B] animate-pulse">
-                        Searching hybrid vector index & synthesizing evidence...
+                    <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm border border-white/10">AI</div>
+                    <div class="bg-slate-900/70 border border-white/10 rounded-2xl p-4 text-cyan-400 animate-pulse font-mono text-xs flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                        Retrieving hybrid dense-sparse vector contexts & synthesizing response...
                     </div>
                 </div>
             `;
@@ -409,17 +574,19 @@
                 let citationsHtml = '';
                 if (data.citations && data.citations.length > 0) {
                     citationsHtml = `
-                        <div class="mt-3 pt-3 border-t border-[#E2E8F0]/60">
-                            <div class="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-1.5">Verified Evidence & Citations</div>
-                            <div class="flex flex-wrap gap-1.5">
+                        <div class="mt-3 pt-3 border-t border-white/[0.08]">
+                            <div class="text-[10px] font-mono font-semibold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span> Verified Grounded Citations
+                            </div>
+                            <div class="flex flex-wrap gap-2">
                                 ${data.citations.map(c => {
                                     const safeSource = escapeHtml(c.source || 'Unknown');
                                     const safeSnippet = escapeHtml(c.snippet || '');
                                     const pageNum = parseInt(c.page) || 1;
                                     const scoreVal = (parseFloat(c.distance) || 0).toFixed(3);
                                     return `
-                                    <span class="px-2 py-0.5 bg-white border border-[#CBD5E1] rounded text-[11px] font-mono text-[#334155]" title="${safeSnippet}">
-                                        ${safeSource} p.${pageNum} · Score: ${scoreVal}
+                                    <span class="px-2.5 py-1 bg-slate-950/80 border border-cyan-500/30 rounded-lg text-[11px] font-mono text-cyan-300 hover:border-cyan-400 transition-all" title="${safeSnippet}">
+                                        📄 ${safeSource} · p.${pageNum} <span class="text-slate-500">|</span> <span class="text-emerald-400">Score: ${scoreVal}</span>
                                     </span>
                                 `;
                                 }).join('')}
@@ -432,8 +599,8 @@
                 const safeReplyText = escapeHtml(rawReplyText);
                 messages.innerHTML += `
                     <div class="flex gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-[#2563EB] text-white flex items-center justify-center font-bold text-xs shrink-0">AI</div>
-                        <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-4 text-[#1E293B] max-w-[85%] leading-relaxed">
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm border border-white/10">AI</div>
+                        <div class="bg-slate-900/70 border border-white/10 rounded-2xl p-4 text-slate-200 max-w-[85%] leading-relaxed shadow-sm">
                             <div class="whitespace-pre-wrap">${safeReplyText}</div>
                             ${citationsHtml}
                         </div>
@@ -444,8 +611,8 @@
                 if (loadingEl) loadingEl.remove();
                 messages.innerHTML += `
                     <div class="flex gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-[#DC2626] text-white flex items-center justify-center font-bold text-xs shrink-0">!</div>
-                        <div class="bg-[#FEF2F2] border border-[#FECACA] rounded-2xl p-4 text-[#991B1B] max-w-[85%]">
+                        <div class="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-bold text-xs shrink-0">!</div>
+                        <div class="bg-rose-950/60 border border-rose-800/80 rounded-2xl p-4 text-rose-300 max-w-[85%] text-xs font-mono">
                             Error querying RAG: ${err.message}
                         </div>
                     </div>
@@ -453,7 +620,6 @@
             } finally {
                 sendBtn.disabled = false;
                 messages.scrollTop = messages.scrollHeight;
-                // FIX F6 — Trim DOM to last 20 messages
                 const allMsgs = messages.querySelectorAll(':scope > div');
                 if (allMsgs.length > 20) {
                     for (let i = 0; i < allMsgs.length - 20; i++) {
@@ -467,6 +633,10 @@
             const fileInput = document.getElementById('fileUploadInput');
             const statusDiv = document.getElementById('uploadStatus');
             const btn = document.getElementById('uploadBtn');
+            const stepper = document.getElementById('pipelineStepper');
+            const pBar = document.getElementById('pipelineProgressBar');
+            const pText = document.getElementById('pipelinePercentText');
+            const pPhase = document.getElementById('pipelinePhaseText');
 
             if (!fileInput.files || fileInput.files.length === 0) {
                 alert('Please select a file to upload.');
@@ -474,8 +644,6 @@
             }
 
             const file = fileInput.files[0];
-
-            // FIX F5 — Client-side file size and extension validation
             const MAX_SIZE = 25 * 1024 * 1024; // 25MB
             if (file.size > MAX_SIZE) {
                 alert('File is too large. Maximum size is 25MB.');
@@ -492,9 +660,14 @@
             formData.append('file', file);
 
             btn.disabled = true;
-            btn.innerText = "Uploading & Indexing...";
-            statusDiv.className = "text-xs mt-1.5 text-center text-[#2563EB] font-medium block";
-            statusDiv.innerText = "Ingesting " + file.name + "...";
+            btn.innerText = "Ingestion Underway...";
+            stepper.classList.remove('hidden');
+            pBar.style.width = '20%';
+            pText.innerText = '20%';
+            pPhase.innerText = '1. Parsing ' + file.name + ' (PyMuPDF)...';
+
+            statusDiv.className = "text-xs mt-2 text-center text-cyan-400 font-mono block";
+            statusDiv.innerText = "Transmitting to neural gateway...";
 
             try {
                 const res = await authFetch('/api/documents/upload', {
@@ -512,7 +685,6 @@
                 const jobId = data.job_id;
                 fileInput.value = '';
 
-                // Poll job status until completed or failed
                 let attempts = 0;
                 let failCount = 0;
                 const pollInterval = setInterval(async () => {
@@ -525,43 +697,56 @@
                             const jobs = await jRes.json();
                             const currentJob = jobs.find(j => j.id === jobId);
                             if (currentJob) {
+                                const pct = currentJob.progress_percent || 20;
+                                pBar.style.width = pct + '%';
+                                pText.innerText = pct + '%';
+
+                                if (pct >= 20 && pct < 50) {
+                                    pPhase.innerText = '2. Recursive Text Chunking (1000 char windows)...';
+                                    document.getElementById('step-chunk').className = 'text-cyan-400 font-bold';
+                                } else if (pct >= 50 && pct < 100) {
+                                    pPhase.innerText = '3. Dense SentenceTransformer Encoding (384-dim)...';
+                                    document.getElementById('step-embed').className = 'text-cyan-400 font-bold';
+                                }
+
                                 if (currentJob.status === 'completed') {
                                     clearInterval(pollInterval);
-                                    statusDiv.className = "text-xs mt-1.5 text-center text-[#16A34A] font-semibold block";
-                                    statusDiv.innerText = "✓ Indexed successfully into Knowledge Base!";
+                                    pBar.style.width = '100%';
+                                    pText.innerText = '100%';
+                                    pPhase.innerText = '4. Vector Synced to Qdrant Cloud ✓';
+                                    document.getElementById('step-sync').className = 'text-emerald-400 font-bold';
+
+                                    statusDiv.className = "text-xs mt-2 text-center text-emerald-400 font-mono block";
+                                    statusDiv.innerText = "✓ Document fully indexed into knowledge graph!";
                                     btn.disabled = false;
                                     btn.innerText = "Ingest & Index Vector Chunks";
                                     loadMetrics();
                                     loadDocuments();
-                                    setTimeout(() => { statusDiv.className = "hidden"; }, 4000);
+                                    setTimeout(() => { stepper.classList.add('hidden'); statusDiv.classList.add('hidden'); }, 5000);
                                     return;
                                 } else if (currentJob.status === 'failed') {
                                     clearInterval(pollInterval);
-                                    statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
+                                    statusDiv.className = "text-xs mt-2 text-center text-rose-400 font-mono block";
                                     statusDiv.innerText = "Failed: " + (currentJob.error_message || "Ingestion error");
                                     btn.disabled = false;
                                     btn.innerText = "Ingest & Index Vector Chunks";
                                     return;
-                                } else {
-                                    statusDiv.innerText = `Processing: ${currentJob.progress_percent || 30}% (chunking & embedding)...`;
                                 }
                             }
                         }
                     } catch (e) {
-                        // FIX F4 — failCount guard on network errors
                         failCount++;
                         console.error("Poll error:", e);
                         if (failCount > 5) {
                             clearInterval(pollInterval);
-                            statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
-                            statusDiv.innerText = "Network error while polling job status.";
+                            statusDiv.className = "text-xs mt-2 text-center text-rose-400 font-mono block";
+                            statusDiv.innerText = "Network polling timeout.";
                             btn.disabled = false;
                             btn.innerText = "Ingest & Index Vector Chunks";
                             return;
                         }
                     }
 
-                    // FIX F4 — 120s max (60 attempts × 2s)
                     if (attempts > 60) {
                         clearInterval(pollInterval);
                         btn.disabled = false;
@@ -572,7 +757,7 @@
                 }, 2000);
 
             } catch (err) {
-                statusDiv.className = "text-xs mt-1.5 text-center text-[#DC2626] block";
+                statusDiv.className = "text-xs mt-2 text-center text-rose-400 font-mono block";
                 statusDiv.innerText = "Error: " + err.message;
                 btn.disabled = false;
                 btn.innerText = "Ingest & Index Vector Chunks";

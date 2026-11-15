@@ -592,8 +592,8 @@ def debug_llm_test(current_user: AuthenticatedUser = Depends(get_current_user)):
     return results
 
 @app.get("/api/debug/test-flow", tags=["General"])
-def debug_test_flow(current_user: AuthenticatedUser = Depends(get_current_user)):
-    """Profiles the exact steps of RAGSearch and vector query to find the bottleneck."""
+def debug_test_flow(current_user: AuthenticatedUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Profiles the exact steps of RAGSearch, lifecycle ingestion, and vector query to find the bottleneck."""
     import time
     timings = {}
 
@@ -613,14 +613,34 @@ def debug_test_flow(current_user: AuthenticatedUser = Depends(get_current_user))
     except Exception as e:
         timings["2_init_rag_search_err"] = str(e)
 
+    # Test direct synchronous ingestion of 1 chunk to see what fails in lifecycle!
+    t0 = time.time()
+    try:
+        from src.rag.db.lifecycle import DocumentLifecycleService
+        lifecycle = DocumentLifecycleService(db, v_store)
+        test_doc = lifecycle.ingest_document(
+            tenant_id=current_user.tenant_id,
+            filename=f"sync_test_{int(time.time())}.txt",
+            file_type="txt",
+            content_bytes=b"This is a direct synchronous ingestion test.",
+            raw_chunks=[{"text": "This is a direct synchronous ingestion test.", "page": 1, "type": "text", "summary": None}],
+            page_count=1
+        )
+        timings["3_direct_ingest_success"] = str(test_doc.id)
+        timings["3_direct_ingest_time"] = round(time.time() - t0, 3)
+    except Exception as ing_err:
+        import traceback
+        timings["3_direct_ingest_err"] = str(ing_err)
+        timings["3_direct_ingest_trace"] = traceback.format_exc()[-400:]
+
     t0 = time.time()
     try:
         query_text = "test"
         res = v_store.query(query_text, top_k=2, use_hybrid=False, use_rerank=False, tenant_id=current_user.tenant_id)
-        timings["3_vector_query"] = round(time.time() - t0, 3)
-        timings["3_results_count"] = len(res)
+        timings["4_vector_query"] = round(time.time() - t0, 3)
+        timings["4_results_count"] = len(res)
     except Exception as e:
-        timings["3_vector_query_err"] = str(e)
+        timings["4_vector_query_err"] = str(e)
 
     return timings
 

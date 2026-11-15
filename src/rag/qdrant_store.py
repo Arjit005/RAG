@@ -82,21 +82,13 @@ class QdrantVectorStore(BaseVectorStore):
                     distance=qmodels.Distance.COSINE
                 )
             )
-            # Create payload indexes for high-speed tenant pre-filtering and document cascading
+
+        # Always verify/create payload indexes for high-speed tenant pre-filtering and document cascading
+        for field_name in ["tenant_id", "document_id", "chunk_type"]:
             try:
                 self.client.create_payload_index(
                     collection_name=self.collection_name,
-                    field_name="tenant_id",
-                    field_schema=qmodels.PayloadSchemaType.KEYWORD
-                )
-                self.client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name="document_id",
-                    field_schema=qmodels.PayloadSchemaType.KEYWORD
-                )
-                self.client.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name="chunk_type",
+                    field_name=field_name,
                     field_schema=qmodels.PayloadSchemaType.KEYWORD
                 )
             except Exception as e:

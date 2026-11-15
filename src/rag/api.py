@@ -365,26 +365,34 @@ def process_document_ingestion_job(
     """
     Background worker orchestrating extraction, chunking, embedding, and vector synchronization.
     Updates the persistent IngestionJob status and progress atomically.
+    Decoupled from FastAPI event loop and executes without PyTorch/langchain memory overhead.
     """
     db = SessionLocal()
     job = None
-    try:
-        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
-        if job:
-            job.status = IngestionStatus.PROCESSING.value
-            job.progress_percent = 20
-            job.updated_at = datetime.datetime.utcnow()
-            db.commit()
 
-        # Text extraction & chunking using dataloader logic
+    def update_job_progress(pct: int, msg: Optional[str] = None):
+        try:
+            target_job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+            if target_job:
+                target_job.status = IngestionStatus.PROCESSING.value
+                target_job.progress_percent = pct
+                target_job.updated_at = datetime.datetime.utcnow()
+                db.commit()
+        except Exception as upd_err:
+            logger.warning(f"Failed to update progress {pct}% for job {job_id}: {upd_err}")
+            db.rollback()
+
+    try:
+        update_job_progress(20, "Extracting and validating document")
+
+        # Text extraction & chunking using pure-python zero-overhead chunker
+        from src.rag.embedding import recursive_character_chunk
         raw_chunks = []
         page_count = 1
 
         if file_type == "txt":
             text = content_bytes.decode("utf-8", errors="ignore")
-            from langchain_text_splitters import RecursiveCharacterTextSplitter
-            splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            split_texts = splitter.split_text(text)
+            split_texts = recursive_character_chunk(text, chunk_size=1000, chunk_overlap=200)
             if not split_texts and text.strip():
                 split_texts = [text.strip()]
             for idx, chunk_str in enumerate(split_texts):
@@ -395,31 +403,21 @@ def process_document_ingestion_job(
                     "summary": None
                 })
         elif file_type == "pdf":
-            import tempfile, pymupdf
-            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                tmp.write(content_bytes)
-                tmp_path = tmp.name
+            import pymupdf
+            doc_pdf = pymupdf.open(stream=content_bytes, filetype="pdf")
             try:
-                doc_pdf = pymupdf.open(tmp_path)
                 page_count = len(doc_pdf)
-                from langchain_text_splitters import RecursiveCharacterTextSplitter
-                splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-
                 for page_num in range(page_count):
                     page = doc_pdf[page_num]
-                    # Extract text blocks preserving paragraph structure
                     blocks = page.get_text("blocks")
                     block_texts = [b[4].strip() for b in blocks if len(b) > 4 and b[4].strip()]
-                    
                     if block_texts:
                         combined_page_text = "\n\n".join(block_texts)
                     else:
                         combined_page_text = page.get_text().strip()
 
                     if combined_page_text:
-                        chunks_for_page = splitter.split_text(combined_page_text)
-                        if not chunks_for_page:
-                            chunks_for_page = [combined_page_text]
+                        chunks_for_page = recursive_character_chunk(combined_page_text, chunk_size=1000, chunk_overlap=200)
                         for c_idx, sub_chunk in enumerate(chunks_for_page):
                             raw_chunks.append({
                                 "text": sub_chunk,
@@ -427,32 +425,27 @@ def process_document_ingestion_job(
                                 "type": "text",
                                 "summary": None
                             })
-                doc_pdf.close()
             finally:
-                if os.path.exists(tmp_path):
-                    try:
-                        os.remove(tmp_path)
-                    except Exception:
-                        pass
+                doc_pdf.close()
         else:
             # Fallback for csv, json, md, etc.
             text = content_bytes.decode("utf-8", errors="ignore")
-            raw_chunks.append({
-                "text": text[:2000] if text.strip() else f"File: {filename}",
-                "page": 1,
-                "type": "text",
-                "summary": None
-            })
+            chunks_text = recursive_character_chunk(text, chunk_size=1000, chunk_overlap=200)
+            if not chunks_text:
+                chunks_text = [text[:2000] if text.strip() else f"File: {filename}"]
+            for c_idx, sub_chunk in enumerate(chunks_text):
+                raw_chunks.append({
+                    "text": sub_chunk,
+                    "page": 1,
+                    "type": "text",
+                    "summary": None
+                })
 
         logger.info(f"Chunking completed for {filename}: generated {len(raw_chunks)} chunks.")
-
         if not raw_chunks:
             raise ValueError(f"No extractable text found in '{filename}'.")
 
-        if job:
-            job.progress_percent = 50
-            job.updated_at = datetime.datetime.utcnow()
-            db.commit()
+        update_job_progress(40, f"Chunking complete ({len(raw_chunks)} chunks)")
 
         # Lifecycle synchronization to DB and Qdrant
         vector_store = get_shared_vector_store()
@@ -463,9 +456,11 @@ def process_document_ingestion_job(
             file_type=file_type,
             content_bytes=content_bytes,
             raw_chunks=raw_chunks,
-            page_count=page_count
+            page_count=page_count,
+            progress_callback=lambda pct, msg: update_job_progress(pct, msg)
         )
 
+        job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
         if job:
             job.document_id = doc.id
             job.status = IngestionStatus.COMPLETED.value
@@ -476,8 +471,7 @@ def process_document_ingestion_job(
     except Exception as e:
         logger.exception(f"Document ingestion job {job_id} failed: {e}")
         try:
-            if not job:
-                job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
+            job = db.query(IngestionJob).filter(IngestionJob.id == job_id).first()
             if job:
                 job.status = IngestionStatus.FAILED.value
                 job.error_message = str(e)[:500]
@@ -932,16 +926,20 @@ async def upload_document(
     db.add(job)
     db.commit()
 
-    # Schedule background processing
+    # Schedule background processing in a dedicated daemon thread to completely decouple from Uvicorn event loop
     file_type = ext.lstrip(".")
-    background_tasks.add_task(
-        process_document_ingestion_job,
-        job_id=job_id,
-        tenant_id=tenant_id,
-        filename=safe_filename,
-        file_type=file_type,
-        content_bytes=content
-    )
+    import threading
+    threading.Thread(
+        target=process_document_ingestion_job,
+        kwargs={
+            "job_id": job_id,
+            "tenant_id": tenant_id,
+            "filename": safe_filename,
+            "file_type": file_type,
+            "content_bytes": content
+        },
+        daemon=True
+    ).start()
 
     return {
         "status": "accepted",

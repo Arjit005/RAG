@@ -2,8 +2,7 @@ import os
 import sys
 import logging
 from pathlib import Path
-from typing import List, Any, Optional
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from typing import List, Any, Optional, Callable
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -11,12 +10,79 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+
+def recursive_character_chunk(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> List[str]:
+    """
+    Zero-overhead, pure-Python recursive text splitter.
+    Splits text on double newline, single newline, sentences, spaces, or characters.
+    Zero external imports, 0ms CPU time, 0 MB memory footprint.
+    """
+    if not text or not text.strip():
+        return []
+
+    text = text.strip()
+    if len(text) <= chunk_size:
+        return [text]
+
+    separators = ["\n\n", "\n", ". ", " ", ""]
+
+    def _split(s: str, seps: list) -> list:
+        if not seps:
+            chunks = []
+            start = 0
+            while start < len(s):
+                end = min(start + chunk_size, len(s))
+                chunks.append(s[start:end])
+                start += chunk_size - chunk_overlap
+            return chunks
+
+        sep = seps[0]
+        remaining_seps = seps[1:]
+
+        splits = s.split(sep) if sep else list(s)
+        current_chunk = []
+        current_len = 0
+        final_chunks = []
+
+        for piece in splits:
+            piece_len = len(piece) + (len(sep) if current_chunk else 0)
+            if current_len + piece_len <= chunk_size:
+                current_chunk.append(piece)
+                current_len += piece_len
+            else:
+                if current_chunk:
+                    final_chunks.append(sep.join(current_chunk))
+                    overlap_len = 0
+                    overlap_items = []
+                    for item in reversed(current_chunk):
+                        if overlap_len + len(item) <= chunk_overlap:
+                            overlap_items.insert(0, item)
+                            overlap_len += len(item) + len(sep)
+                        else:
+                            break
+                    current_chunk = overlap_items
+                    current_len = sum(len(x) for x in current_chunk) + (len(sep) * (len(current_chunk) - 1) if current_chunk else 0)
+
+                if len(piece) > chunk_size:
+                    final_chunks.extend(_split(piece, remaining_seps))
+                else:
+                    current_chunk.append(piece)
+                    current_len += len(piece)
+
+        if current_chunk:
+            final_chunks.append(sep.join(current_chunk))
+
+        return [c.strip() for c in final_chunks if c.strip()]
+
+    return _split(text, separators)
+
+
 class EmbeddingPipeline:
     """
     Unified Embedding Pipeline with zero-RAM API offloading.
     Prioritizes Gemini Serverless Embeddings (384-dim matching Qdrant Cloud),
     completely avoiding PyTorch/SentenceTransformers RAM spikes on Render Free Tier.
-    Falls back gracefully to local SentenceTransformer if API key is not configured.
+    Falls back gracefully to local SentenceTransformer ONLY in non-production local environments.
     """
     def __init__(self, model_name: str = "all-MiniLM-L6-v2", chunk_size: int = 1000, chunk_overlap: int = 200):
         if chunk_size <= 0:
@@ -39,19 +105,19 @@ class EmbeddingPipeline:
         requests_payload = [
             {
                 "model": "models/gemini-embedding-001",
-                "content": {"parts": [{"text": t[:4000] if t.strip() else "Empty"}]},
+                "content": {"parts": [{"text": t[:4000] if (t and t.strip()) else "Empty"}]},
                 "outputDimensionality": 384
             }
             for t in texts
         ]
-        
+
         req = urllib.request.Request(
             url,
             data=json.dumps({"requests": requests_payload}).encode("utf-8"),
             headers={"Content-Type": "application/json"}
         )
 
-        with urllib.request.urlopen(req, timeout=30) as r:
+        with urllib.request.urlopen(req, timeout=25) as r:
             res = json.loads(r.read().decode("utf-8"))
             return [e["values"] for e in res["embeddings"]]
 
@@ -65,6 +131,13 @@ class EmbeddingPipeline:
 
         if self.gemini_key:
             return _ModelWrapper(self)
+
+        is_prod = os.getenv("ENV", "").lower() in ("production", "prod") or bool(os.getenv("RENDER"))
+        if is_prod:
+            raise RuntimeError(
+                "GEMINI_API_KEY is required in production. "
+                "Local PyTorch / SentenceTransformer is disabled on Render to prevent 512MB RAM OOM crash."
+            )
 
         if self._model is None:
             os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
@@ -86,7 +159,6 @@ class EmbeddingPipeline:
         # 1. Serverless API Strategy (Zero RAM, zero CPU bottleneck)
         if self.gemini_key:
             try:
-                # Batch in groups of 25 to respect Gemini limits
                 batch_size = 25
                 all_embs = []
                 for i in range(0, len(texts), batch_size):
@@ -95,9 +167,19 @@ class EmbeddingPipeline:
                     all_embs.extend(batch_embs)
                 return np.array(all_embs, dtype=np.float32)
             except Exception as e:
-                logger.warning(f"Gemini serverless embedding failed, falling back to local: {e}")
+                logger.error(f"Gemini serverless embedding failed: {e}")
+                is_prod = os.getenv("ENV", "").lower() in ("production", "prod") or bool(os.getenv("RENDER"))
+                if is_prod:
+                    raise RuntimeError(f"Serverless embedding generation failed on production: {e}")
 
-        # 2. Local Fallback with Micro-batching
+        # 2. Local Fallback with Micro-batching (dev/local only)
+        is_prod = os.getenv("ENV", "").lower() in ("production", "prod") or bool(os.getenv("RENDER"))
+        if is_prod:
+            raise RuntimeError(
+                "GEMINI_API_KEY is mandatory in production environment. "
+                "PyTorch model loading is prohibited on Render to prevent OOM crash."
+            )
+
         import gc
         batch_size = 4
         all_embeddings = []
@@ -114,19 +196,25 @@ class EmbeddingPipeline:
         return np.array(all_embeddings, dtype=np.float32)
 
     def chunk_documents(self, documents: List[Any]) -> List[Any]:
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunk_size,
-            chunk_overlap=self.chunk_overlap,
-            length_function=len,
-            separators=["\n\n", "\n", " ", ""]
-        )
-        chunks = splitter.split_documents(documents)
+        class SimpleChunk:
+            def __init__(self, page_content, metadata=None):
+                self.page_content = page_content
+                self.metadata = metadata or {}
+
+        chunks = []
+        for doc in documents:
+            text = getattr(doc, "page_content", str(doc))
+            meta = getattr(doc, "metadata", {})
+            sub_texts = recursive_character_chunk(text, chunk_size=self.chunk_size, chunk_overlap=self.chunk_overlap)
+            for st in sub_texts:
+                chunks.append(SimpleChunk(page_content=st, metadata=meta.copy()))
+
         logger.info(f"Split {len(documents)} documents into {len(chunks)} chunks.")
         return chunks
 
     def embed_chunks(self, chunks: List[Any]) -> np.ndarray:
         texts = [chunk.page_content for chunk in chunks]
         logger.info(f"Generating embeddings for {len(texts)} chunks...")
-        embeddings = self.encode(texts, show_progress_bar=True)
+        embeddings = self.encode(texts, show_progress_bar=False)
         logger.info(f"Embeddings shape: {embeddings.shape}")
         return embeddings

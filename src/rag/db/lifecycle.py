@@ -1,5 +1,5 @@
 import logging
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 from sqlalchemy.orm import Session
 from src.rag.db.models import Document, DocumentChunk, IngestionStatus, SyncStatus
 from src.rag.db.repository import DocumentRepository
@@ -36,7 +36,8 @@ class DocumentLifecycleService:
         file_type: str,
         content_bytes: bytes,
         raw_chunks: List[Dict[str, Any]],
-        page_count: int = 1
+        page_count: int = 1,
+        progress_callback: Optional[Callable[[int, str], None]] = None
     ) -> Document:
         """
         Idempotent document ingestion:
@@ -55,6 +56,8 @@ class DocumentLifecycleService:
             page_count=page_count,
             status=IngestionStatus.PROCESSING
         )
+        if progress_callback:
+            progress_callback(30, "Document metadata stored")
 
         # Step 2: Save chunk records
         chunks = self.repo.save_chunks(doc.id, tenant_id, raw_chunks)
@@ -64,17 +67,21 @@ class DocumentLifecycleService:
             self.db.commit()
             raise ValueError(f"Document '{filename}' could not be chunked or contained no readable text.")
 
+        if progress_callback:
+            progress_callback(50, f"Saved {len(chunks)} chunks to database")
+
         # Step 3 & 4: Embed chunk texts and Synchronize to Vector Store
         try:
             embed_texts = [c.summary_text if (c.chunk_type == "table" and c.summary_text) else c.content_text for c in chunks]
-            batch_size = 4
+            batch_size = 25
             embeddings = []
-            import gc
             for i in range(0, len(embed_texts), batch_size):
                 batch = embed_texts[i:i+batch_size]
                 batch_embeddings = self.embedding_pipeline.encode(batch, show_progress_bar=False).tolist()
                 embeddings.extend(batch_embeddings)
-                gc.collect()
+
+            if progress_callback:
+                progress_callback(75, f"Generated {len(embeddings)} dense embeddings")
 
             chunks_payload = [
                 {
@@ -101,6 +108,8 @@ class DocumentLifecycleService:
             doc.status = IngestionStatus.COMPLETED.value
             self.db.commit()
             self.db.refresh(doc)
+            if progress_callback:
+                progress_callback(100, "Vector sync completed")
             return doc
         except Exception as e:
             logger.error(f"Embedding or vector synchronization failed for doc {doc.id}: {e}")

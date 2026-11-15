@@ -701,11 +701,14 @@
                                 pBar.style.width = pct + '%';
                                 pText.innerText = pct + '%';
 
-                                if (pct >= 20 && pct < 50) {
+                                if (pct >= 20 && pct < 40) {
+                                    pPhase.innerText = '1. Parsing & Structure Extraction...';
+                                    document.getElementById('step-extract').className = 'text-cyan-400 font-bold';
+                                } else if (pct >= 40 && pct < 70) {
                                     pPhase.innerText = '2. Recursive Text Chunking (1000 char windows)...';
                                     document.getElementById('step-chunk').className = 'text-cyan-400 font-bold';
-                                } else if (pct >= 50 && pct < 100) {
-                                    pPhase.innerText = '3. Dense SentenceTransformer Encoding (384-dim)...';
+                                } else if (pct >= 70 && pct < 100) {
+                                    pPhase.innerText = '3. Zero-RAM Serverless Vector Embedding (384-dim)...';
                                     document.getElementById('step-embed').className = 'text-cyan-400 font-bold';
                                 }
 
